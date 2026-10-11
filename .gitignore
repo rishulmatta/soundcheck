@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# next.js
+.next/
+out/
+build/
+
+# env and secrets (never commit the Qloo or Anthropic key)
+.env
+.env.*
+!.env.example
+
+# private strategy notes (judge-facing repo must not carry these)
+docs/strategy.md
+
+# cached Qloo responses (private server-side cache only)
+.cache/
+data/qloo-cache/
+
+# misc
+.DS_Store
+*.pem
+*.log
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+coverage/
