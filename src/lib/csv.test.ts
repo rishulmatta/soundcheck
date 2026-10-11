@@ -62,7 +62,7 @@ describe("planToCsv", () => {
       quadrant: "established",
       legDays: "0",
       topAgeBucket: "30_to_34",
-      femaleShare: "0.58",
+      femaleScore: "0.16",
       openers: "Harbor Lights | Dry Pines",
       suggestion: "1,800-cap hall",
     });

@@ -14,7 +14,7 @@ export const CSV_COLUMNS = [
   "quadrant",
   "legDays",
   "topAgeBucket",
-  "femaleShare",
+  "femaleScore",
   "openers",
   "sponsors",
   "places",

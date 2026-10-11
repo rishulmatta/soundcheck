@@ -83,6 +83,7 @@ export type CityScore = z.infer<typeof CityScore>;
 export const Demographics = z.object({
   /** Qloo age buckets with scores vs baseline, roughly -1..1. */
   age: z.array(z.object({ bucket: z.string(), score: z.number() })),
+  /** Qloo gender scores vs baseline, roughly -1..1 (not shares). Positive female = skews female. */
   gender: z.object({ female: z.number(), male: z.number() }),
   status: ToolStatus,
 });

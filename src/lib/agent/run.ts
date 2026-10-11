@@ -317,7 +317,7 @@ export function copyFacts(ctx: RunContext, city: CityScore, legDays: number, dem
       citiesScored: cands.length,
       affinityMultipleVsPoolMedian: multiple,
       topAgeBuckets: topAgeBuckets(demo),
-      femaleShare: demo.gender.female,
+      femaleScoreVsBaseline: demo.gender.female,
       momentum: trend,
     },
     soundcheck: {

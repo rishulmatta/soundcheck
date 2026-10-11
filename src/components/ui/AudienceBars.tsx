@@ -19,9 +19,10 @@ export function bucketLabel(bucket: string): string {
 /** Plain-div bars: signal fill on a line track, values in Data style on the right. Bars fill after the numbers land. */
 export function AudienceBars({ demographics, play = true, animate = true }: { demographics: Demographics; play?: boolean; animate?: boolean }) {
   const { age, gender, status } = demographics;
-  const female = Math.round(gender.female * 100);
-  const male = Math.round(gender.male * 100);
-  const skew = female - male >= 4 ? "Skews female" : male - female >= 4 ? "Skews male" : "Evenly split";
+  // Qloo gives gender as scores against a baseline (roughly -1..1), not shares.
+  const diff = gender.female - gender.male;
+  const skew = diff >= 0.04 ? "Skews female" : diff <= -0.04 ? "Skews male" : "Evenly split";
+  const skewValue = `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(2)}`;
   return (
     <div>
       <div className="label mb-2 flex items-center gap-2">
@@ -54,7 +55,7 @@ export function AudienceBars({ demographics, play = true, animate = true }: { de
             })}
           </div>
           <p className="mt-2 text-[13px] leading-[18px] text-ink-muted">
-            {skew} <span className="num text-ink">{female} / {male}</span>
+            {skew} <span className="num text-ink">{skewValue}</span> <span className="text-ink-faint">vs baseline</span>
           </p>
           {status !== "ok" && <LimitedData status={status} className="mt-3">Partial Qloo audience data. Showing what came back.</LimitedData>}
         </>

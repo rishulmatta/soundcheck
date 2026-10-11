@@ -28,6 +28,21 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
 - [ ] Join Qloo Discord `#api-help`: https://discord.gg/rF9PKsD5Q7
 - [ ] Escalate in `#api-help` if the key has not arrived by Oct 16
 
+## Key-day checklist (run the moment QLOO_API_KEY arrives)
+Findings from building the Qloo layer against the live docs on 2026-10-12. Each needs a real response to settle.
+- [ ] Put the key in `.env.local` as `QLOO_API_KEY`, set `QLOO_MOCK=0`, run `curl -N -X POST localhost:3000/api/plan -H 'content-type: application/json' -d '{"actQuery":"<real act>","stops":8}'`
+- [ ] **Heatmap comparability:** per-city `filter.location.query` heatmaps may be normalized within each city (docs example tops out at exactly 1.0). If so, the quadrant chart is wrong. Compare against one regional query with `output.heatmap.boundary=urn:entity:locality`. The client notes `meta.note` when the top cell is exactly 1.
+- [ ] **Compare response shape** for `/v2/analysis/compare`: overlap is computed from per-side scores if present, else "degraded" with overlap 0. Inspect a real response and fix `schemas.ts`.
+- [ ] **Explainability JSON layout** (`query.explainability`): parsed defensively; confirm field names. It returns scores only, so the client writes the sentence itself.
+- [ ] Do `signal.location.query` and `feature.explainability` change artist/person/podcast results, or are they silently ignored?
+- [ ] Video game type URN: `urn:entity:videogame` on /search, /v2/trending, compare vs `urn:entity:video_game` on insights. Confirm which each endpoint accepts.
+- [ ] Trending percentile scale (0–100 vs 0–1); code handles both.
+- [ ] Does heatmap `take=50` cap cells?
+- [ ] Demographics cannot be localized per the docs; the agent calls it without a location. Check whether a location param exists anyway.
+- [ ] Comedian openers: taxonomy tag is `urn:tag:genre:person:comedian` (not occupation). Consider adding an optional `tagIds` filter to `relatedActs` in the contract.
+- [ ] Gender comes back as scores vs baseline, not shares (types, fixture, UI and CSV already switched to scores on 2026-10-12).
+- [ ] Test comedian, podcast and author coverage; pick the three real seeded acts; run `QLOO_MOCK=0 pnpm dlx tsx scripts/seed.ts`.
+
 ## Pending: day 0 to 2 scaffold (Oct 11 to 13)
 - [x] Next.js 16.4 scaffolded (App Router, TypeScript, Tailwind v4, src/, pnpm). Note: this Next.js has breaking changes; read `AGENTS.md` and `node_modules/next/dist/docs/` before writing app code.
 - [x] Installed ai, @ai-sdk/anthropic, zod, @upstash/redis, maplibre-gl, d3-scale, nanoid, vitest
