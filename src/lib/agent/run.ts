@@ -297,7 +297,7 @@ function stopDemographics(ctx: RunContext, cityId: string): Demographics {
   return ctx.state.cityDemographics.get(cityId) ?? { age: [], gender: { female: 0, male: 0 }, status: "empty" };
 }
 
-export function copyFacts(ctx: RunContext, city: CityScore, legDays: number, demo: Demographics) {
+export function copyFacts(ctx: RunContext, city: CityScore, legDays: number, demo: Demographics, order = 1) {
   const { state, input } = ctx;
   const act = state.act!;
   const cands = state.candidates ?? [];
@@ -330,7 +330,21 @@ export function copyFacts(ctx: RunContext, city: CityScore, legDays: number, dem
       travelDaysFromPreviousStop: legDays,
     },
     window: input.window,
+    writing: { stopOrder: order, leadWith: leadAngle(order, demo, trend, legDays) },
   };
+}
+
+/**
+ * The evidence each stop's whyHere sentence opens with. Copy is written one stop at a time, so without this every
+ * sentence lands on the same template. Picks only angles the facts can support, rotating by tour order.
+ */
+export function leadAngle(order: number, demo: Demographics, trend: string, legDays: number): string {
+  const angles: string[] = ["affinity rank among the cities scored"];
+  if (topAgeBuckets(demo).length) angles.push("the age buckets that over-index");
+  if (trend === "rising" || trend === "falling") angles.push("momentum");
+  if (legDays > 0) angles.push("the travel days from the previous stop and why the routing works");
+  angles.push("the gap between affinity and popularity");
+  return angles[(order - 1) % angles.length];
 }
 
 type Facts = ReturnType<typeof copyFacts>;
@@ -432,7 +446,7 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
   };
   await mapLimit(order, 4, async (city, i) => {
     const demo = stopDemographics(ctx, city.id);
-    const facts = copyFacts(ctx, city, legDays[i] ?? 0, demo);
+    const facts = copyFacts(ctx, city, legDays[i] ?? 0, demo, i + 1);
     let copy = templateCopy(facts);
     if (deps.model) {
       try {

@@ -50,11 +50,11 @@ Findings from building the Qloo layer against the live docs on 2026-10-12. Each 
 - [x] Installed ai, @ai-sdk/anthropic, zod, @upstash/redis, maplibre-gl, d3-scale, nanoid, vitest
 - [x] `.env.example` written; `src/app/globals.css` carries the design tokens; `src/lib/types.ts` is the shared Plan schema; `src/fixtures/plan.sample.json` is the synthetic demo plan (validated by a vitest test)
 - [x] Qloo client, tools, mock, city pools (see session 2 above)
-- [x] **Deployed on Railway** (project `soundcheck`, services `soundcheck` + `Redis`): https://soundcheck-production-0c8e.up.railway.app . Deploy with `railway up --service soundcheck --ci`. Variables set: QLOO_MOCK=1, REDIS_URL=${{Redis.REDIS_URL}}, NODE_ENV. Still to set: ANTHROPIC_API_KEY (the user must run `railway variable set ANTHROPIC_API_KEY=<key> --service soundcheck`; the agent is not permitted to search the machine for credentials), QLOO_API_KEY (then QLOO_MOCK=0). `/api/health` reports backend, mode and which seeded plans are persisted. Seeded demos are generated on first request if missing (`src/lib/ensureSeed.ts`).
+- [x] **Deployed on Railway** (project `soundcheck`, services `soundcheck` + `Redis`): https://soundcheck-production-0c8e.up.railway.app . Deploy with `railway up --service soundcheck --ci`. Variables set: QLOO_MOCK=1, REDIS_URL=${{Redis.REDIS_URL}}, NODE_ENV. ANTHROPIC_API_KEY set 2026-10-12 (health reports `model: true`). Still to set: QLOO_API_KEY (then QLOO_MOCK=0), and SOUNDCHECK_ADMIN_TOKEN (the value is in the local `.env.local`; the agent may not write Railway secrets, so the user runs `railway variable set SOUNDCHECK_ADMIN_TOKEN=<value> --service soundcheck`). Flush a stored plan with `curl -X DELETE -H "Authorization: Bearer $TOKEN" $HOST/api/plan/demo-musician`; the next read regenerates it. `/api/health` reports backend, mode and which seeded plans are persisted. Seeded demos are generated on first request if missing (`src/lib/ensureSeed.ts`).
 
 ## Pending: week 1 musician demo (Oct 14 to 19)
 - [x] Agent loop, scoring, routing, landing, plan page, map tour, persistence (session 2)
-- [ ] Run the agent loop with a real ANTHROPIC_API_KEY once and read the model-written `whyHere` / `suggestion` copy; tune `src/lib/agent/prompts.ts`
+- [x] Run the agent loop with a real ANTHROPIC_API_KEY once and read the model-written `whyHere` / `suggestion` copy; tune `src/lib/agent/prompts.ts`. Done 2026-10-12 locally (mock Qloo, real model, ~30s per plan, 10 call types). First pass was one template repeated per city; fixed by rotating a `writing.leadWith` angle per stop (`leadAngle` in run.ts) and loosening the prompt. The three Railway plans still hold orchestrator-only copy until they are flushed (needs SOUNDCHECK_ADMIN_TOKEN on Railway).
 - [ ] Act search autocomplete on the landing form via `/search` (currently a plain text input)
 - [ ] `/plan/<unknown>` returns 200 with not-found UI (id read inside Suspense); acceptable, or move notFound() outside the boundary
 - [ ] Plan-page hover on quadrant dots flies the map (debounced 140 ms); decide whether hover should only highlight and click should fly
@@ -100,7 +100,6 @@ Findings from building the Qloo layer against the live docs on 2026-10-12. Each 
 ## Next session starts here
 1. `pnpm install && QLOO_MOCK=1 pnpm dlx tsx scripts/seed.ts && QLOO_MOCK=1 pnpm dev`, open /plan/demo-musician and /plan/demo-musician/tour to see the current state.
 2. If the Qloo key has arrived: run the key-day checklist above first.
-3. Set ANTHROPIC_API_KEY on Railway (`railway variable set ANTHROPIC_API_KEY=... --service soundcheck`) and re-seed so the demo copy is model-written.
-4. Then the week 1 list: real-model copy tuning, act autocomplete, the small UI issues above.
+3. If SOUNDCHECK_ADMIN_TOKEN is now set on Railway: DELETE the three `demo-*` plans (see Deployed note above), re-open each `/plan/demo-*` page, and read the model-written copy on the live site.
+4. Then the week 1 list: act autocomplete, the small UI issues above.
 5. Update this file before ending the session.
-3. Update this file before ending the session.

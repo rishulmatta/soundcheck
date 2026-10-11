@@ -3,7 +3,7 @@ import type { QlooClient, RelatedEntity } from "@/lib/qloo/contract";
 import { Plan, PlanInput, type CityPoolEntry, type PlanEvent, type ToolResult, type ToolStatus } from "@/lib/types";
 import type { AgentModel } from "./model";
 import type { AgentToolSpec } from "./tools";
-import { copyUsesOnlyGivenNumbers, numbersIn, runPlan, type RunDeps } from "./run";
+import { copyUsesOnlyGivenNumbers, leadAngle, numbersIn, runPlan, type RunDeps } from "./run";
 import { cityPoolFor } from "./pool";
 
 /* ---------------------------------------------------------------- stubs */
@@ -316,5 +316,22 @@ describe("pool fixture", () => {
       const pool: CityPoolEntry[] = cityPoolFor(region);
       expect(new Set(pool.map((c) => c.id)).size).toBe(pool.length);
     }
+  });
+});
+
+describe("leadAngle", () => {
+  const demo = { age: [], gender: { female: 0, male: 0 }, status: "empty" as const };
+  it("rotates through the angles the facts support, by stop order", () => {
+    const a1 = leadAngle(1, demo, "unknown", 0);
+    const a2 = leadAngle(2, demo, "unknown", 0);
+    const a3 = leadAngle(3, demo, "unknown", 0);
+    expect(a1).not.toBe(a2);
+    expect(a3).toBe(a1);
+  });
+  it("adds momentum and travel angles only when there is something to say", () => {
+    const angles = new Set([1, 2, 3, 4].map((o) => leadAngle(o, demo, "rising", 2)));
+    expect(angles.size).toBe(4);
+    expect([...angles].some((a) => a.includes("momentum"))).toBe(true);
+    expect([...angles].some((a) => a.includes("travel"))).toBe(true);
   });
 });

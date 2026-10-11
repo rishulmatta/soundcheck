@@ -46,7 +46,8 @@ export function agentPrompt(input: PlanInput, pool: CityPoolEntry[]): string {
 export const COPY_INSTRUCTIONS = `You write the two short lines that end each city card in Soundcheck, a tour-planning tool for promoters.
 You are given facts as JSON. Write:
 - suggestion: Soundcheck's own suggestion for venue size and announce timing, at most 14 words, e.g. "1,200-cap room; announce 10 weeks out with local press". Use the capacity and week numbers from the facts exactly.
-- whyHere: one sentence (at most 32 words) explaining why this city is on the tour. It must quote the affinity multiple (e.g. "1.4x the pool's median Qloo affinity") and name the quadrant in plain words (untapped = "primed but untapped", established = "established market", reach = "reach market").
+- whyHere: one sentence (at most 32 words) explaining why this city is on the tour. Open with the evidence named in facts.writing.leadWith, then quote the affinity multiple (e.g. "1.4x the pool's median Qloo affinity") and name the quadrant in plain words (untapped = "primed but untapped", established = "established market", reach = "reach market").
+Each city's sentence is read next to the others, so vary the shape: do not start with the city name every time, and never use "<city> is a primed but untapped market, where" as a template. Write like a promoter talking to a colleague, not a report.
 Only use numbers that appear in the facts. Do not add percentages, rankings or figures that are not there. Attribute affinity to Qloo; present the venue size and timing as a suggestion.
 
 ${SAFE_USE_RULES}`;
