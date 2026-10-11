@@ -1,0 +1,76 @@
+/**
+ * The Qloo tool contract. Implemented in src/lib/qloo (live client + mock), consumed by src/lib/agent.
+ * Every method returns a ToolResult envelope; nothing throws on thin data. Only network/auth failures become status "error".
+ */
+import type { ActType, CityPoolEntry, ToolResult } from "@/lib/types";
+
+export interface EntityCandidate {
+  id: string;
+  name: string;
+  type: ActType;
+  subtype?: string;
+  popularity?: number;
+  imageUrl?: string;
+  /** Short disambiguation line, e.g. "Artist · Indie rock · popularity 0.78". */
+  hint: string;
+}
+
+export interface TagRef { id: string; name: string; type?: string }
+
+export interface HeatmapCell { lat: number; lon: number; affinity: number; affinityRank: number; popularity: number }
+export interface CityHeatmap {
+  city: CityPoolEntry;
+  /** Aggregate for the city: mean of the top cells, or the single locality value. */
+  affinity: number;
+  affinityRank: number;
+  popularity: number;
+  cells: HeatmapCell[];
+}
+
+export interface DemographicsData {
+  age: { bucket: string; score: number }[];
+  gender: { female: number; male: number };
+}
+
+export interface TrendingData {
+  trend: "rising" | "flat" | "falling" | "unknown";
+  velocity?: number;
+  weeks?: number;
+  series?: { date: string; percentile: number }[];
+}
+
+export interface RelatedEntity {
+  id: string;
+  name: string;
+  type?: string;
+  popularity?: number;
+  affinity?: number;
+  tags: string[];
+  /** From feature.explainability when present, otherwise undefined. */
+  explanation?: string;
+}
+
+export interface CompareData { overlap: number; sharedTags: string[] }
+
+export interface QlooClient {
+  /** GET /search */
+  searchEntity(query: string, type: ActType): Promise<ToolResult<EntityCandidate[]>>;
+  /** GET /v2/tags */
+  findTags(query: string, opts?: { typeHint?: string }): Promise<ToolResult<TagRef[]>>;
+  /** GET /v2/insights?filter.type=urn:heatmap for one city, seeded by the act (or by tags when the act is thin). */
+  heatmapForCity(seed: { entityIds?: string[]; tagIds?: string[] }, city: CityPoolEntry): Promise<ToolResult<CityHeatmap>>;
+  /** GET /v2/insights?filter.type=urn:demographics, optionally localized. */
+  demographics(seed: { entityIds?: string[]; tagIds?: string[] }, opts?: { locationQuery?: string }): Promise<ToolResult<DemographicsData>>;
+  /** GET /v2/trending */
+  trending(entityId: string, type: ActType, opts?: { weeks?: number }): Promise<ToolResult<TrendingData>>;
+  /** GET /v2/insights?filter.type=<same type> localized to a city, excluding the act. Openers / support acts. */
+  relatedActs(entityId: string, type: ActType, opts: { locationQuery?: string; take?: number; explain?: boolean }): Promise<ToolResult<RelatedEntity[]>>;
+  /** GET /v2/analysis/compare between the act and a candidate opener. */
+  compareAudiences(aEntityId: string, bEntityId: string, type: ActType): Promise<ToolResult<CompareData>>;
+  /** GET /v2/insights?filter.type=urn:entity:brand seeded by the act, optionally biased by demographics. */
+  brands(entityId: string, opts?: { ageBuckets?: string[]; take?: number; explain?: boolean }): Promise<ToolResult<RelatedEntity[]>>;
+  /** GET /v2/insights?filter.type=urn:entity:place localized to a city with tag filters. */
+  places(entityId: string, opts: { locationQuery: string; tagIds?: string[]; minPopularity?: number; take?: number; explain?: boolean }): Promise<ToolResult<RelatedEntity[]>>;
+  /** GET /v2/insights?filter.type=urn:tag: the act's taste profile. */
+  tasteTags(entityId: string, opts?: { take?: number }): Promise<ToolResult<TagRef[]>>;
+}
