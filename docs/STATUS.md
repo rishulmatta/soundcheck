@@ -50,7 +50,7 @@ Findings from building the Qloo layer against the live docs on 2026-10-12. Each 
 - [x] Installed ai, @ai-sdk/anthropic, zod, @upstash/redis, maplibre-gl, d3-scale, nanoid, vitest
 - [x] `.env.example` written; `src/app/globals.css` carries the design tokens; `src/lib/types.ts` is the shared Plan schema; `src/fixtures/plan.sample.json` is the synthetic demo plan (validated by a vitest test)
 - [x] Qloo client, tools, mock, city pools (see session 2 above)
-- [ ] Vercel project linked, env vars set (ANTHROPIC_API_KEY, QLOO_API_KEY, QLOO_MOCK, UPSTASH_*), first deploy. Without Upstash, plans live only in memory on serverless; provision Upstash Redis via the Vercel Marketplace.
+- [x] **Deployed on Railway** (project `soundcheck`, services `soundcheck` + `Redis`): https://soundcheck-production-0c8e.up.railway.app . Deploy with `railway up --service soundcheck --ci`. Variables set: QLOO_MOCK=1, REDIS_URL=${{Redis.REDIS_URL}}, NODE_ENV. Still to set: ANTHROPIC_API_KEY, QLOO_API_KEY (then QLOO_MOCK=0). `/api/health` reports backend, mode and which seeded plans are persisted. Seeded demos are generated on first request if missing (`src/lib/ensureSeed.ts`).
 
 ## Pending: week 1 musician demo (Oct 14 to 19)
 - [x] Agent loop, scoring, routing, landing, plan page, map tour, persistence (session 2)
@@ -90,6 +90,7 @@ Findings from building the Qloo layer against the live docs on 2026-10-12. Each 
 - Static curated city pools per region; Qloo locality search only for custom cities.
 - Nearest-neighbor routing with 1 travel day between stops.
 - Print-to-PDF via styled page, not a PDF library.
+- Hosting and Redis on Railway (user's paid account); only free resources otherwise. No Vercel, no Upstash.
 - Repo private until the public README is written. Devpost rules (verified 2026-10-11) require a public repo with a visible license at submission; nothing requires it public during the build.
 
 ## Open questions
@@ -99,7 +100,7 @@ Findings from building the Qloo layer against the live docs on 2026-10-12. Each 
 ## Next session starts here
 1. `pnpm install && QLOO_MOCK=1 pnpm dlx tsx scripts/seed.ts && QLOO_MOCK=1 pnpm dev`, open /plan/demo-musician and /plan/demo-musician/tour to see the current state.
 2. If the Qloo key has arrived: run the key-day checklist above first.
-3. Deploy a Vercel preview (link project, set env vars, provision Upstash) so there is a live URL early.
+3. Set ANTHROPIC_API_KEY on Railway (`railway variable set ANTHROPIC_API_KEY=... --service soundcheck`) and re-seed so the demo copy is model-written.
 4. Then the week 1 list: real-model copy tuning, act autocomplete, the small UI issues above.
 5. Update this file before ending the session.
 3. Update this file before ending the session.

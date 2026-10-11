@@ -18,6 +18,10 @@ QLOO_MOCK=1 pnpm dev
 
 Open `/plan/demo-musician` for a finished plan, `/plan/demo-musician/tour` for the self-running map tour, `/run?demo=1` for a replayed live run. `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`.
 
+## Deploy
+
+Railway: `railway up --service soundcheck --ci`. Variables: `REDIS_URL=${{Redis.REDIS_URL}}`, `QLOO_API_KEY`, `QLOO_MOCK`, `ANTHROPIC_API_KEY`. `/api/health` shows the active backend.
+
 ## Docs
 
 | File | What it is |
