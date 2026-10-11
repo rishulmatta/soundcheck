@@ -3,7 +3,7 @@
 **Design system (source of truth for tokens, type, components):** https://claude.ai/artifact/DKvPVuT6JumRtuxCKLdEbs
 Agents building UI read its `project/README.md` first, then `project/tokens.json`. The Scorefluent design system in the same account belongs to another app and is never used here.
 
-Guiding rule: it must look like a promoter's deliverable, not a chatbot. The agent is visible in a side rail, but the center of the screen is always the plan. Three screens plus a print view.
+Guiding rule: it must look like a promoter's deliverable, not a chatbot. The agent is visible in a side rail, but the center of the screen is always the plan. Four screens plus a print view.
 
 **Visual direction:** dark "stage" theme (near-black background, one warm accent for the act, a cool accent for Qloo signals), condensed tour-poster display type for headings, tabular numerals for scores. Every number from Qloo carries a small "Qloo" tag so judges see provenance at a glance. Mobile stacks everything in the same order.
 
@@ -97,6 +97,66 @@ Same layout as the finished plan, but the content fills in as the agent works. L
 - **City cards:** one per stop, each with a quadrant label (Untapped / Established / Reach), affinity and popularity numbers, audience bars from demographics, openers with `/v2/analysis/compare` overlap, sponsors and activations each with a "why" popover from `feature.explainability`, and a one-line "Why here" sentence. Thin data shows a muted "Limited Qloo data" band instead of an empty section.
 - **Agent trace** collapses to a footer bar on the finished plan and expands to the full rail from Screen 2.
 - **Provenance footer** on every plan satisfies the kit's safe-use rules.
+
+## Screen 4: Map tour (presentation mode)
+
+The plan as a self-running show. One button on the plan header ("Play tour") and the `#tour` anchor on seeded demo links open it. Judges who click one link see the whole argument in about 80 seconds without reading anything. It is also the source of the Devpost hero video and GIF.
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ [ACT NAME]                                   ┌─ quadrant mini ─┐  ✕ │
+│ Stop 2 of 12 · BOISE                         │  ●◦   ·  ·      │    │
+│                                              │  ·  ·    ·  ·   │    │
+│          · ·  ·                              └─────────────────┘    │
+│       ·  ◉ ◉ ◉  ·        full-bleed map, dark basemap               │
+│     ·  ◉ ◉②◉ ◉  ·        heatmap glow blooming around the stop      │
+│       ·  ◉ ◉ ◉  ·        route leg drawing in from stop ①           │
+│          · ·                                                        │
+│  ┌─ TOUR CARD ───────────────────────────────┐                      │
+│  │ ② BOISE                        Untapped   │                      │
+│  │ Affinity 0.91  rank 3/38  pop 0.22  Qloo  │                      │
+│  │ 25–34 ▇▇▇▇▇▇  skews female                │                      │
+│  │ Opener  Act A · overlap 71%               │                      │
+│  │ Sponsor Brand X                           │                      │
+│  │ Fans over-index 4.1× here. Nobody has     │                      │
+│  │ played within 300 mi.                     │                      │
+│  └───────────────────────────────────────────┘                      │
+│                  ‹   ▶ ❚❚   ›    ①②③④⑤⑥⑦⑧⑨⑩⑪⑫                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Layout.** The map fills the viewport in `bg-sunken`. Top-left: act name in `display-md` and "Stop n of N · CITY" in `label` plus `display-lg`. Top-right: a 200px quadrant thumbnail with the current city's dot ringed, and a close control. Bottom-left: the `TourCard`, a compact `CityCard` for one glance. Bottom-centre: `TourControls`, previous, play/pause, next, and one progress dot per stop. On phones the card spans the width above the controls and the quadrant thumbnail is hidden.
+
+**Sequence per stop.** Default 6 seconds per stop, so a 12-stop tour runs about 80 seconds with the finale.
+
+| Time | Map | Card and chrome |
+|---|---|---|
+| 0 ms | `flyTo` the stop, 1400 ms, zoom about 8.5, pitch 30, ease-in-out | Previous card slides out left, 200 ms. Header city name cross-fades. |
+| 0 to 1200 ms | Route leg from the previous stop draws in `route`, synced to the fly | Progress dot for this stop starts its ring. |
+| 1400 ms | Stop marker lands and pulses once (scale 1 to 1.4 to 1, 400 ms). Heatmap points bloom outward from the marker, opacity 0 to 0.4, 400 ms, staggered 20 ms by distance. | |
+| 1600 ms | | `TourCard` slides up from the bottom edge, 300 ms ease-out. Affinity counts up 0.00 to its value over 500 ms in tabular mono so digits never jitter. |
+| 2200 ms | | Audience bar fills, 400 ms. Opener, sponsor and the why-here sentence fade in 60 ms apart. |
+| 2600 to 6000 ms | Hold. A slow 2 percent zoom drift keeps the frame alive. | Progress ring completes at 6000 ms. |
+| 6000 ms | Next stop. | |
+
+**Finale.** After the last stop the map `fitBounds` to the whole route over 1600 ms. The full route sits in `route`, every Untapped stop keeps its glow, Established stops dim to `ink-muted`. A summary card replaces the tour card: "12 stops · 5 untapped markets · 61 Qloo calls" in `data`, then Replay, Open plan, and Share buttons.
+
+**Controls.** Space pauses, left and right arrows step, Escape returns to the plan page. Clicking a progress dot jumps to that stop. Hovering the card pauses the clock and shows the "why" popovers. Map scroll-zoom is off during the tour so a stray wheel does not break the frame; drag is allowed and resumes the sequence on release.
+
+**Reduced motion.** `prefers-reduced-motion: reduce` swaps `flyTo` for `jumpTo`, drops the count-up and the bloom stagger, and shows cards at rest. Timings stay the same so the tour still narrates.
+
+**Why it wins points.** Design: it is the moment the product looks finished. Impact: a Live Nation judge sees a routed tour with openers and sponsors in the time it takes to read a paragraph. Qloo depth: every card carries the `QlooTag`, and the finale states the call count.
+
+## Motion across the app
+
+The full rules, easings and durations live in the design system's brand book (Motion section) with three animated reference components: TourCard, TourControls and MotionPrimitives. This is where each move is used.
+
+- **Landing.** The wordmark sets in place, then the three demo cards enter 40 ms apart, 12 px up with `ease-out`. Hovering a card raises its border and lifts the map thumbnail 2 px. Nothing else moves until the user clicks.
+- **Live run.** The agent rail's current step shows a `spot` ring that breathes once per second. Skeleton blocks cross-fade into content in 200 ms as each tool result lands. Map pins drop in as heatmaps return. Quadrant dots land one by one, 40 ms apart, the highlighted cell's ground fading in first. City cards enter in route order once routing completes, 60 ms apart.
+- **Finished plan.** On first paint the route draws over 600 ms and the affinity numbers count up. Hover linking across quadrant dot, map pin and city card in 150 ms. Clicking a card flies the map to its stop in 600 ms. The "why" popover enters 8 px up in 300 ms.
+- **Map tour.** The full six-second beat per stop in Screen 4: fly, draw the leg, pulse the marker, bloom the heatmap, slide the card, count the number, fill the bar, hold.
+- **Exports and share.** The share button swaps its label to "Copied" for 1.5 s; no toast. The print view has no motion at all.
+- **Reduced motion.** Every move above keeps its state and timing and loses its travel. Checked once per screen in the verification pass.
 
 ## Print view (`/plan/[id]/print`)
 

@@ -11,7 +11,8 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
 ## Done
 - [x] Research handoff written (`docs/RESEARCH.md`)
 - [x] Build plan written (`docs/PLAN.md` + `docs/UX.md` + `docs/STACK.md`): strategy changes, UI screens, architecture, 19-day schedule, verification
-- [x] Soundcheck Design System published (Claude Design artifact): tokens for Stage/Print themes, brand book, 10 components, cover. Link in `docs/UX.md`.
+- [x] Soundcheck Design System published (Claude Design artifact): tokens for Stage/Print themes, brand book, 13 components incl. animated TourCard, TourControls, MotionPrimitives, plus a Motion section in the brand book. Link in `docs/UX.md`.
+- [x] Map tour (presentation mode) and app-wide motion specified in `docs/UX.md` screen 4 and the Motion section
 - [x] Git repo initialised, MIT `LICENSE`, `.gitignore`, pushed to GitHub (private for now)
 
 ## In progress
@@ -39,6 +40,7 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
 - [ ] Demographics, trending, routing (`lib/routing.ts`)
 - [ ] Landing page with 3 seeded demo cards + custom form
 - [ ] Plan page: map, quadrant chart, route strip, city cards, agent trace rail
+- [ ] Map tour page (`/plan/[id]/tour`): sequencer, progressive route, heatmap bloom, TourCard, TourControls, keyboard, reduced motion
 - [ ] Shareable `/plan/[id]` persistence
 - [ ] On key arrival: swap mocks for live, test comedian + podcast + author coverage, note findings here
 
@@ -51,6 +53,7 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
 - [ ] Thin-data fallbacks (tag-seeded) and "Limited Qloo data" UI state
 - [ ] Print view + CSV export
 - [ ] Pre-run and cache the 3 seeded demos
+- [ ] Record the map tour as the Devpost hero GIF and a short video
 
 ## Pending: week 3 polish and write-up (Oct 26 to 30)
 - [ ] Mobile pass, degraded states, rate-limit protection

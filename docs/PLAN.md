@@ -58,6 +58,7 @@ Stack choices with rationale live in `docs/STACK.md`. File layout:
 app/
   page.tsx                    landing: 3 seeded demos, one click each, plus custom form
   plan/[id]/page.tsx          saved plan: map, quadrant, city cards, trace, export buttons
+  plan/[id]/tour/page.tsx     map tour: full-bleed map, auto-cycling stops (docs/UX.md screen 4)
   plan/[id]/print/page.tsx    print-styled view for PDF
   api/plan/route.ts           streaming agent run (AI SDK), writes plan on completion
   api/plan/[id]/csv/route.ts  CSV export
@@ -68,6 +69,8 @@ lib/
   agent/run.ts                planner loop, step guard, coverage checklist
   agent/prompts.ts            system prompt incl. safe-use rules
   routing.ts                  nearest-neighbor over lat/lon with travel-day gaps
+  tour/sequencer.ts           per-stop timeline (fly, draw leg, bloom, card, hold), pause/seek, reduced-motion
+  tour/geo.ts                 lineSliceAlong for progressive route drawing, no turf dependency
   score.ts                    underserved score = f(affinity_rank, popularity)
 data/cities/{na,uk-ie,eu}.json  curated metro pools with lat/lon (~40 / ~15 / ~25)
 ```
@@ -92,6 +95,7 @@ data/cities/{na,uk-ie,eu}.json  curated metro pools with lat/lon (~40 / ~15 / ~2
 **Days 3 to 8 (Oct 14 to 19): musician demo end to end**
 - Qloo client with cache and status envelopes. Agent loop streaming steps to the UI.
 - Heatmap scoring over the pool, demographics, trending, routing, map, city cards, quadrant chart.
+- Map tour (screen 4) on the musician demo: flyTo sequencing, progressive route, heatmap bloom, tour card. This is what the Devpost hero GIF is cut from.
 - Shareable plan URL. This is the minimum submittable product. Swap mocks for live calls the day the key arrives and test podcast and comedian coverage that same day.
 
 **Days 9 to 14 (Oct 20 to 25): depth and breadth**
@@ -108,6 +112,7 @@ data/cities/{na,uk-ie,eu}.json  curated metro pools with lat/lon (~40 / ~15 / ~2
 
 - Fresh clone + `.env.example` + `QLOO_MOCK=1` runs all three seeded demos locally with no key.
 - Live deploy: each seeded link loads in under 3 seconds from cache and shows the full trace.
+- Map tour: a 12-stop seeded tour runs end to end without a dropped frame on a mid-range laptop, keyboard controls work, reduced-motion mode is checked once.
 - Trace audit: a seeded musician plan shows at least 10 distinct Qloo call types with status `ok`.
 - Thin-data test: run an obscure act and confirm the UI shows "limited data" states, not errors, and the agent falls back to tag seeds.
 - Quota test: 20 consecutive custom runs do not produce 429s thanks to caching.
