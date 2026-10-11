@@ -1,0 +1,19 @@
+/* Print view: light paper, A4, one city per page. Backgrounds must print so the signal-soft cell and chips survive. */
+@page { size: A4; margin: 14mm; }
+/* The page paints in print colours from the first byte. <html data-theme="print"> is set after hydration by PrintTheme; this scope repeats the print tokens so there is no dark flash before then. */
+.print-root {
+  min-height: 100vh; color-scheme: light; color: var(--ink);
+  --bg: #f7f4ee; --bg-raised: #ffffff; --bg-sunken: #eeeae2; --line: #dcd5ca; --line-strong: #b9b0a3;
+  --ink: #1a1715; --ink-muted: #5f584f; --ink-faint: #8c8478; --spot: #b4620a; --spot-soft: #fbe9cf; --on-spot: #ffffff;
+  --signal: #0f6f94; --signal-soft: #d9eef7; --signal-glow: #0f6f9433; --ok: #1f7a4d; --ok-soft: #dcf3e6;
+  --warn: #a8432b; --warn-soft: #fbe3dc; --danger: #b3261e; --danger-soft: #fbdcd8; --focus: #0f6f94;
+  --shadow-popover: 0 8px 24px #1a171526; --shadow-glow: 0 0 16px #0f6f9433;
+  background: var(--bg);
+}
+.print-root { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+@media print {
+  html, body { background: var(--bg) !important; height: auto; }
+  .print-sheet { break-after: page; break-inside: avoid; }
+  .print-sheet:last-child { break-after: auto; }
+  .print-root * { animation: none !important; transition: none !important; }
+}

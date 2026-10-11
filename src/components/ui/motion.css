@@ -1,0 +1,33 @@
+/* Soundcheck motion primitives. Only transform and opacity animate. Durations and easings come from the tokens in globals.css. */
+@keyframes sc-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes sc-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sc-pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes sc-dot { from { opacity: 0; transform: scale(0); } to { opacity: 1; transform: scale(1); } }
+@keyframes sc-draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes sc-breathe { 0%, 100% { opacity: 0.9; transform: scale(1); } 50% { opacity: 0; transform: scale(2.2); } }
+@keyframes sc-set { from { opacity: 0; letter-spacing: 0.09em; } to { opacity: 1; letter-spacing: 0.01em; } }
+
+.sc-enter { animation: sc-enter var(--dur-base) var(--ease-out) both; animation-delay: var(--sc-delay, 0ms); }
+.sc-fade { animation: sc-fade 200ms var(--ease-out) both; animation-delay: var(--sc-delay, 0ms); }
+.sc-popover { animation: sc-pop var(--dur-base) var(--ease-out) both; }
+.sc-dot { transform-box: fill-box; transform-origin: center; animation: sc-dot var(--dur-base) var(--ease-out) both; animation-delay: var(--sc-delay, 0ms); }
+.sc-leg { transform-origin: left center; animation: sc-draw var(--sc-dur, 600ms) var(--ease-in-out) both; animation-delay: var(--sc-delay, 0ms); }
+.sc-set { animation: sc-set var(--dur-slow) var(--ease-out) both; }
+
+/* The current step in the agent rail: a spot ring that breathes once per second. */
+.sc-breathe { position: relative; }
+.sc-breathe::after { content: ""; position: absolute; inset: -1.5px; border-radius: 999px; border: 1.5px solid var(--spot); animation: sc-breathe 1s var(--ease-in-out) infinite; }
+
+/* Audience bars fill from the left after the number has landed. */
+.sc-bar { transform-origin: left center; transform: scaleX(0); transition: transform var(--dur-slow) var(--ease-in-out); transition-delay: var(--sc-delay, 0ms); }
+.sc-bar[data-play="true"] { transform: scaleX(1); }
+.sc-bar[data-static="true"] { transform: scaleX(1); transition: none; }
+
+/* Hover linking runs in --dur-fast. */
+.sc-link { transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-enter, .sc-dot, .sc-leg, .sc-fade, .sc-bar { animation-delay: 0ms !important; transition-delay: 0ms !important; }
+  .sc-enter { animation-name: sc-fade; animation-duration: var(--dur-fast) !important; }
+  .sc-breathe::after { animation: none; opacity: 0.6; }
+}

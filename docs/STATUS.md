@@ -15,19 +15,23 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
 - [x] Map tour (presentation mode) and app-wide motion specified in `docs/UX.md` screen 4 and the Motion section
 - [x] Git repo initialised, MIT `LICENSE`, `.gitignore`, pushed to GitHub (private for now)
 
-## In progress
-- (nothing)
+## In progress (session 2, four parallel agents, disjoint ownership)
+- Qloo tool layer (`src/lib/qloo/**`, `src/data/cities/**`) built from the live hackathon docs; mock client for QLOO_MOCK=1
+- Agent loop + API (`src/lib/agent/**`, `src/lib/score.ts`, `src/lib/routing.ts`, `src/lib/store.ts`, `src/lib/csv.ts`, `src/lib/seeds.ts`, `src/app/api/**`, `scripts/seed.ts`)
+- UI shell (`src/components/ui`, `src/components/plan`, `src/app/page.tsx`, `src/app/run`, `src/app/plan/[id]/page.tsx`, print view)
+- Map + tour (`src/components/map/**`, `src/components/tour/**`, `src/lib/tour/**`, `src/app/plan/[id]/tour`)
+- Cross-workstream contracts: `src/lib/qloo/contract.ts`, `src/lib/store.ts` exports, `src/components/map/PlanMap.tsx` props, `PlanEvent` NDJSON stream from POST /api/plan
 
 ## Pending: admin (do these first, they take days to clear)
-- [ ] Request Qloo hackathon API key: https://forms.gle/zz12orkLHTAneLGz6
+- [x] Requested Qloo hackathon API key on 2026-10-12 (expected within a day or two). Build runs with QLOO_MOCK=1 until it lands.
 - [ ] Join hackathon on Devpost: https://qloo.devpost.com/
 - [ ] Join Qloo Discord `#api-help`: https://discord.gg/rF9PKsD5Q7
 - [ ] Escalate in `#api-help` if the key has not arrived by Oct 16
 
 ## Pending: day 0 to 2 scaffold (Oct 11 to 13)
-- [ ] `npx create-next-app@latest` (App Router, TypeScript, Tailwind) in this directory
-- [ ] Install `ai`, `@ai-sdk/anthropic`, `maplibre-gl`, KV client (Upstash Redis via Vercel Marketplace or Vercel KV)
-- [ ] `.env.example` with `QLOO_API_KEY`, `ANTHROPIC_API_KEY`, `QLOO_MOCK=1`
+- [x] Next.js 16.4 scaffolded (App Router, TypeScript, Tailwind v4, src/, pnpm). Note: this Next.js has breaking changes; read `AGENTS.md` and `node_modules/next/dist/docs/` before writing app code.
+- [x] Installed ai, @ai-sdk/anthropic, zod, @upstash/redis, maplibre-gl, d3-scale, nanoid, vitest
+- [x] `.env.example` written; `src/app/globals.css` carries the design tokens; `src/lib/types.ts` is the shared Plan schema; `src/fixtures/plan.sample.json` is the synthetic demo plan (validated by a vitest test)
 - [ ] `lib/qloo/client.ts` (base URL `https://hackathon.api.qloo.com`, `X-Api-Key`, retry, cache by URL)
 - [ ] `lib/qloo/tools/*.ts` typed tools with `{ status: ok|empty|partial|degraded|error, data, meta }` envelope
 - [ ] `lib/qloo/mock.ts` synthetic fixtures (hand-written shapes only, never real Qloo responses)
