@@ -1,11 +1,11 @@
 /**
  * Response cache for Qloo GETs, keyed by the full request URL (the API key travels in a header, never in the key).
  *
- * Upstash Redis when UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are set, otherwise an in-memory Map with a
- * size cap. No TTL: the hackathon developer guide allows private server-side caching "with no time limit".
+ * Redis (REDIS_URL on Railway, or Upstash REST) through src/lib/redis.ts when configured, otherwise an in-memory Map
+ * with a size cap. No TTL: the hackathon developer guide allows private server-side caching "with no time limit".
  * Cached values are private runtime data and must never be written into the repo.
  */
-import { Redis } from "@upstash/redis";
+import { getKV, type StringKV } from "@/lib/redis";
 
 export interface QlooCache {
   readonly kind: "redis" | "memory";
@@ -49,14 +49,15 @@ export class RedisCache implements QlooCache {
   private warned = false;
 
   constructor(
-    private readonly redis: Redis,
+    private readonly redis: StringKV,
     private readonly fallback: MemoryCache = new MemoryCache(),
   ) {}
 
   async get(key: string): Promise<unknown | undefined> {
     try {
-      const value = await this.redis.get<unknown>(key);
-      return value ?? undefined;
+      const raw = await this.redis.get(key);
+      if (raw === null) return undefined;
+      return JSON.parse(raw) as unknown;
     } catch (err) {
       this.warn(err);
       return this.fallback.get(key);
@@ -65,7 +66,7 @@ export class RedisCache implements QlooCache {
 
   async set(key: string, value: unknown): Promise<void> {
     try {
-      await this.redis.set(key, value);
+      await this.redis.set(key, JSON.stringify(value));
     } catch (err) {
       this.warn(err);
       await this.fallback.set(key, value);
@@ -75,7 +76,7 @@ export class RedisCache implements QlooCache {
   private warn(err: unknown) {
     if (this.warned) return;
     this.warned = true;
-    console.warn(`[qloo-cache] Upstash Redis unavailable, using in-memory cache: ${String(err)}`);
+    console.warn(`[qloo-cache] Redis unavailable, using in-memory cache: ${String(err)}`);
   }
 }
 
@@ -89,9 +90,8 @@ const globalForCache = globalThis as unknown as { __soundcheckQlooCache?: QlooCa
 /** Process-wide cache singleton (kept on globalThis so Next.js dev reloads do not drop it). */
 export function getQlooCache(): QlooCache {
   if (globalForCache.__soundcheckQlooCache) return globalForCache.__soundcheckQlooCache;
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  const cache: QlooCache = url && token ? new RedisCache(new Redis({ url, token })) : new MemoryCache();
+  const kv = getKV();
+  const cache: QlooCache = kv ? new RedisCache(kv) : new MemoryCache();
   globalForCache.__soundcheckQlooCache = cache;
   return cache;
 }

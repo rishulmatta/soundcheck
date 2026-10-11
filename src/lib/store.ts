@@ -1,13 +1,13 @@
 /**
  * Plan persistence.
- * - Upstash Redis when UPSTASH_REDIS_REST_URL/TOKEN (or the Vercel KV_REST_API_* aliases) are set: key `plan:<id>`, JSON.
+ * - Redis (REDIS_URL on Railway, or Upstash REST) through src/lib/redis.ts when configured: key `plan:<id>`, JSON.
  * - Otherwise an in-memory map plus a JSON file cache under `.cache/plans/<id>.json` (gitignored) so dev restarts keep plans.
  * - `demo-musician` always resolves: when nothing is stored under that id, the bundled sample fixture is served.
  * Server-only. Every read is validated against the Plan schema; unreadable entries are treated as missing.
  */
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { Redis } from "@upstash/redis";
+import { getKV } from "@/lib/redis";
 import { Plan } from "@/lib/types";
 import sample from "@/fixtures/plan.sample.json";
 
@@ -21,14 +21,7 @@ export function isValidPlanId(id: string): boolean {
   return VALID_ID.test(id);
 }
 
-let redisClient: Redis | null | undefined;
-function redis(): Redis | null {
-  if (redisClient !== undefined) return redisClient;
-  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
-  redisClient = url && token ? new Redis({ url, token }) : null;
-  return redisClient;
-}
+const redis = () => getKV();
 
 const fileFor = (id: string) => path.join(process.cwd(), ".cache", "plans", `${id}.json`);
 

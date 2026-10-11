@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { PlanView } from "@/components/plan/PlanView";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { getPlan } from "@/lib/store";
+import { getPlanOrSeed } from "@/lib/ensureSeed";
 
 export const metadata: Metadata = { title: "Tour plan · Soundcheck" };
 
@@ -17,7 +17,7 @@ export default function PlanPage({ params }: { params: Promise<{ id: string }> }
 
 async function Plan({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const plan = await getPlan(id);
+  const plan = await getPlanOrSeed(id);
   if (!plan) notFound();
   return <PlanView plan={plan} />;
 }
