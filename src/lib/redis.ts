@@ -12,6 +12,7 @@ export interface StringKV {
   readonly kind: "redis" | "upstash";
   get(key: string): Promise<string | null>;
   set(key: string, value: string): Promise<void>;
+  del(key: string): Promise<void>;
 }
 
 class IORedisKV implements StringKV {
@@ -23,11 +24,16 @@ class IORedisKV implements StringKV {
   async set(key: string, value: string) {
     await this.client.set(key, value);
   }
+  async del(key: string) {
+    await this.client.del(key);
+  }
 }
 
 class UpstashKV implements StringKV {
   readonly kind = "upstash" as const;
-  constructor(private readonly client: { get<T>(k: string): Promise<T | null>; set(k: string, v: string): Promise<unknown> }) {}
+  constructor(
+    private readonly client: { get<T>(k: string): Promise<T | null>; set(k: string, v: string): Promise<unknown>; del(k: string): Promise<unknown> },
+  ) {}
   async get(key: string) {
     const v = await this.client.get<unknown>(key);
     if (v === null || v === undefined) return null;
@@ -35,6 +41,9 @@ class UpstashKV implements StringKV {
   }
   async set(key: string, value: string) {
     await this.client.set(key, value);
+  }
+  async del(key: string) {
+    await this.client.del(key);
   }
 }
 

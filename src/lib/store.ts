@@ -91,3 +91,22 @@ export async function putPlan(plan: Plan): Promise<void> {
     // Read-only filesystems (serverless) keep the in-memory copy only.
   }
 }
+
+/** Forget a stored plan everywhere (memory, Redis, file cache). The next read of a seeded id regenerates it. */
+export async function deletePlan(id: string): Promise<void> {
+  if (!isValidPlanId(id)) return;
+  memory.delete(id);
+  const r = redis();
+  if (r) {
+    try {
+      await r.del(`plan:${id}`);
+    } catch (err) {
+      console.warn(`[store] redis del failed for ${id}:`, err instanceof Error ? err.message : err);
+    }
+  }
+  try {
+    await fs.unlink(fileFor(id));
+  } catch {
+    // no file cache entry
+  }
+}
