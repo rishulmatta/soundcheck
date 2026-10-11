@@ -1,0 +1,338 @@
+[
+  {
+    "id": "seattle",
+    "name": "Seattle",
+    "country": "US",
+    "lat": 47.61,
+    "lon": -122.33,
+    "metroM": 4.0
+  },
+  {
+    "id": "portland",
+    "name": "Portland",
+    "country": "US",
+    "lat": 45.52,
+    "lon": -122.68,
+    "metroM": 2.5
+  },
+  {
+    "id": "vancouver",
+    "name": "Vancouver",
+    "country": "CA",
+    "lat": 49.28,
+    "lon": -123.12,
+    "metroM": 2.6
+  },
+  {
+    "id": "spokane",
+    "name": "Spokane",
+    "country": "US",
+    "lat": 47.66,
+    "lon": -117.43,
+    "metroM": 0.6
+  },
+  {
+    "id": "boise",
+    "name": "Boise",
+    "country": "US",
+    "lat": 43.62,
+    "lon": -116.21,
+    "metroM": 0.8
+  },
+  {
+    "id": "calgary",
+    "name": "Calgary",
+    "country": "CA",
+    "lat": 51.05,
+    "lon": -114.07,
+    "metroM": 1.6
+  },
+  {
+    "id": "san-francisco",
+    "name": "San Francisco",
+    "country": "US",
+    "lat": 37.77,
+    "lon": -122.42,
+    "metroM": 4.6
+  },
+  {
+    "id": "sacramento",
+    "name": "Sacramento",
+    "country": "US",
+    "lat": 38.58,
+    "lon": -121.49,
+    "metroM": 2.4
+  },
+  {
+    "id": "los-angeles",
+    "name": "Los Angeles",
+    "country": "US",
+    "lat": 34.05,
+    "lon": -118.24,
+    "metroM": 13.2
+  },
+  {
+    "id": "san-diego",
+    "name": "San Diego",
+    "country": "US",
+    "lat": 32.72,
+    "lon": -117.16,
+    "metroM": 3.3
+  },
+  {
+    "id": "las-vegas",
+    "name": "Las Vegas",
+    "country": "US",
+    "lat": 36.17,
+    "lon": -115.14,
+    "metroM": 2.3
+  },
+  {
+    "id": "phoenix",
+    "name": "Phoenix",
+    "country": "US",
+    "lat": 33.45,
+    "lon": -112.07,
+    "metroM": 4.9
+  },
+  {
+    "id": "salt-lake-city",
+    "name": "Salt Lake City",
+    "country": "US",
+    "lat": 40.76,
+    "lon": -111.89,
+    "metroM": 1.3
+  },
+  {
+    "id": "denver",
+    "name": "Denver",
+    "country": "US",
+    "lat": 39.74,
+    "lon": -104.99,
+    "metroM": 3.0
+  },
+  {
+    "id": "albuquerque",
+    "name": "Albuquerque",
+    "country": "US",
+    "lat": 35.08,
+    "lon": -106.65,
+    "metroM": 0.9
+  },
+  {
+    "id": "austin",
+    "name": "Austin",
+    "country": "US",
+    "lat": 30.27,
+    "lon": -97.74,
+    "metroM": 2.4
+  },
+  {
+    "id": "dallas",
+    "name": "Dallas",
+    "country": "US",
+    "lat": 32.78,
+    "lon": -96.8,
+    "metroM": 7.9
+  },
+  {
+    "id": "houston",
+    "name": "Houston",
+    "country": "US",
+    "lat": 29.76,
+    "lon": -95.37,
+    "metroM": 7.3
+  },
+  {
+    "id": "oklahoma-city",
+    "name": "Oklahoma City",
+    "country": "US",
+    "lat": 35.47,
+    "lon": -97.52,
+    "metroM": 1.4
+  },
+  {
+    "id": "tulsa",
+    "name": "Tulsa",
+    "country": "US",
+    "lat": 36.15,
+    "lon": -95.99,
+    "metroM": 1.0
+  },
+  {
+    "id": "omaha",
+    "name": "Omaha",
+    "country": "US",
+    "lat": 41.26,
+    "lon": -95.94,
+    "metroM": 1.0
+  },
+  {
+    "id": "kansas-city",
+    "name": "Kansas City",
+    "country": "US",
+    "lat": 39.1,
+    "lon": -94.58,
+    "metroM": 2.2
+  },
+  {
+    "id": "minneapolis",
+    "name": "Minneapolis",
+    "country": "US",
+    "lat": 44.98,
+    "lon": -93.27,
+    "metroM": 3.7
+  },
+  {
+    "id": "madison",
+    "name": "Madison",
+    "country": "US",
+    "lat": 43.07,
+    "lon": -89.4,
+    "metroM": 0.7
+  },
+  {
+    "id": "milwaukee",
+    "name": "Milwaukee",
+    "country": "US",
+    "lat": 43.04,
+    "lon": -87.91,
+    "metroM": 1.6
+  },
+  {
+    "id": "chicago",
+    "name": "Chicago",
+    "country": "US",
+    "lat": 41.88,
+    "lon": -87.63,
+    "metroM": 9.5
+  },
+  {
+    "id": "st-louis",
+    "name": "St. Louis",
+    "country": "US",
+    "lat": 38.63,
+    "lon": -90.2,
+    "metroM": 2.8
+  },
+  {
+    "id": "new-orleans",
+    "name": "New Orleans",
+    "country": "US",
+    "lat": 29.95,
+    "lon": -90.07,
+    "metroM": 1.3
+  },
+  {
+    "id": "nashville",
+    "name": "Nashville",
+    "country": "US",
+    "lat": 36.16,
+    "lon": -86.78,
+    "metroM": 2.0
+  },
+  {
+    "id": "atlanta",
+    "name": "Atlanta",
+    "country": "US",
+    "lat": 33.75,
+    "lon": -84.39,
+    "metroM": 6.1
+  },
+  {
+    "id": "detroit",
+    "name": "Detroit",
+    "country": "US",
+    "lat": 42.33,
+    "lon": -83.05,
+    "metroM": 4.3
+  },
+  {
+    "id": "columbus",
+    "name": "Columbus",
+    "country": "US",
+    "lat": 39.96,
+    "lon": -83.0,
+    "metroM": 2.1
+  },
+  {
+    "id": "pittsburgh",
+    "name": "Pittsburgh",
+    "country": "US",
+    "lat": 40.44,
+    "lon": -79.99,
+    "metroM": 2.4
+  },
+  {
+    "id": "raleigh",
+    "name": "Raleigh",
+    "country": "US",
+    "lat": 35.78,
+    "lon": -78.64,
+    "metroM": 1.5
+  },
+  {
+    "id": "washington",
+    "name": "Washington",
+    "country": "US",
+    "lat": 38.91,
+    "lon": -77.04,
+    "metroM": 6.3
+  },
+  {
+    "id": "philadelphia",
+    "name": "Philadelphia",
+    "country": "US",
+    "lat": 39.95,
+    "lon": -75.17,
+    "metroM": 6.2
+  },
+  {
+    "id": "new-york",
+    "name": "New York",
+    "country": "US",
+    "lat": 40.71,
+    "lon": -74.01,
+    "metroM": 20.1
+  },
+  {
+    "id": "boston",
+    "name": "Boston",
+    "country": "US",
+    "lat": 42.36,
+    "lon": -71.06,
+    "metroM": 4.9
+  },
+  {
+    "id": "toronto",
+    "name": "Toronto",
+    "country": "CA",
+    "lat": 43.65,
+    "lon": -79.38,
+    "metroM": 6.4
+  },
+  {
+    "id": "ottawa",
+    "name": "Ottawa",
+    "country": "CA",
+    "lat": 45.42,
+    "lon": -75.7,
+    "metroM": 1.5
+  },
+  {
+    "id": "montreal",
+    "name": "Montreal",
+    "country": "CA",
+    "lat": 45.5,
+    "lon": -73.57,
+    "metroM": 4.3
+  },
+  {
+    "id": "halifax",
+    "name": "Halifax",
+    "country": "CA",
+    "lat": 44.65,
+    "lon": -63.57,
+    "metroM": 0.5
+  }
+]

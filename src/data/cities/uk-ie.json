@@ -1,0 +1,138 @@
+[
+  {
+    "id": "london",
+    "name": "London",
+    "country": "GB",
+    "lat": 51.51,
+    "lon": -0.13,
+    "metroM": 14.8
+  },
+  {
+    "id": "brighton",
+    "name": "Brighton",
+    "country": "GB",
+    "lat": 50.82,
+    "lon": -0.14,
+    "metroM": 0.8
+  },
+  {
+    "id": "bristol",
+    "name": "Bristol",
+    "country": "GB",
+    "lat": 51.45,
+    "lon": -2.59,
+    "metroM": 0.7
+  },
+  {
+    "id": "cardiff",
+    "name": "Cardiff",
+    "country": "GB",
+    "lat": 51.48,
+    "lon": -3.18,
+    "metroM": 1.1
+  },
+  {
+    "id": "birmingham",
+    "name": "Birmingham",
+    "country": "GB",
+    "lat": 52.49,
+    "lon": -1.89,
+    "metroM": 2.9
+  },
+  {
+    "id": "nottingham",
+    "name": "Nottingham",
+    "country": "GB",
+    "lat": 52.95,
+    "lon": -1.15,
+    "metroM": 0.8
+  },
+  {
+    "id": "manchester",
+    "name": "Manchester",
+    "country": "GB",
+    "lat": 53.48,
+    "lon": -2.24,
+    "metroM": 2.9
+  },
+  {
+    "id": "liverpool",
+    "name": "Liverpool",
+    "country": "GB",
+    "lat": 53.41,
+    "lon": -2.98,
+    "metroM": 1.4
+  },
+  {
+    "id": "leeds",
+    "name": "Leeds",
+    "country": "GB",
+    "lat": 53.8,
+    "lon": -1.55,
+    "metroM": 1.9
+  },
+  {
+    "id": "sheffield",
+    "name": "Sheffield",
+    "country": "GB",
+    "lat": 53.38,
+    "lon": -1.47,
+    "metroM": 1.4
+  },
+  {
+    "id": "newcastle",
+    "name": "Newcastle",
+    "country": "GB",
+    "lat": 54.98,
+    "lon": -1.62,
+    "metroM": 1.1
+  },
+  {
+    "id": "glasgow",
+    "name": "Glasgow",
+    "country": "GB",
+    "lat": 55.86,
+    "lon": -4.25,
+    "metroM": 1.8
+  },
+  {
+    "id": "edinburgh",
+    "name": "Edinburgh",
+    "country": "GB",
+    "lat": 55.95,
+    "lon": -3.19,
+    "metroM": 0.9
+  },
+  {
+    "id": "belfast",
+    "name": "Belfast",
+    "country": "GB",
+    "lat": 54.6,
+    "lon": -5.93,
+    "metroM": 0.7
+  },
+  {
+    "id": "dublin",
+    "name": "Dublin",
+    "country": "IE",
+    "lat": 53.35,
+    "lon": -6.26,
+    "metroM": 2.0
+  },
+  {
+    "id": "cork",
+    "name": "Cork",
+    "country": "IE",
+    "lat": 51.9,
+    "lon": -8.47,
+    "metroM": 0.4
+  },
+  {
+    "id": "galway",
+    "name": "Galway",
+    "country": "IE",
+    "lat": 53.27,
+    "lon": -9.05,
+    "metroM": 0.1
+  }
+]
