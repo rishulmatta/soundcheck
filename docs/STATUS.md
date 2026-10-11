@@ -43,14 +43,14 @@ Findings from building the Qloo layer against the live docs on 2026-10-12. Each 
 - [ ] Demographics cannot be localized per the docs; the agent calls it without a location. Check whether a location param exists anyway.
 - [ ] Comedian openers: taxonomy tag is `urn:tag:genre:person:comedian` (not occupation). Consider adding an optional `tagIds` filter to `relatedActs` in the contract.
 - [ ] Gender comes back as scores vs baseline, not shares (types, fixture, UI and CSV already switched to scores on 2026-10-12).
-- [ ] Test comedian, podcast and author coverage; pick the three real seeded acts; run `QLOO_MOCK=0 pnpm dlx tsx scripts/seed.ts`.
+- [ ] Test comedian, podcast and author coverage for the seeded acts (Khruangbin, Nate Bargatze, The Rest Is History; set in `src/lib/seeds.ts`, swap if thin); then flush old mock plans from Redis (`plan:demo-*` keys) so they re-seed live.
 
 ## Pending: day 0 to 2 scaffold (Oct 11 to 13)
 - [x] Next.js 16.4 scaffolded (App Router, TypeScript, Tailwind v4, src/, pnpm). Note: this Next.js has breaking changes; read `AGENTS.md` and `node_modules/next/dist/docs/` before writing app code.
 - [x] Installed ai, @ai-sdk/anthropic, zod, @upstash/redis, maplibre-gl, d3-scale, nanoid, vitest
 - [x] `.env.example` written; `src/app/globals.css` carries the design tokens; `src/lib/types.ts` is the shared Plan schema; `src/fixtures/plan.sample.json` is the synthetic demo plan (validated by a vitest test)
 - [x] Qloo client, tools, mock, city pools (see session 2 above)
-- [x] **Deployed on Railway** (project `soundcheck`, services `soundcheck` + `Redis`): https://soundcheck-production-0c8e.up.railway.app . Deploy with `railway up --service soundcheck --ci`. Variables set: QLOO_MOCK=1, REDIS_URL=${{Redis.REDIS_URL}}, NODE_ENV. Still to set: ANTHROPIC_API_KEY, QLOO_API_KEY (then QLOO_MOCK=0). `/api/health` reports backend, mode and which seeded plans are persisted. Seeded demos are generated on first request if missing (`src/lib/ensureSeed.ts`).
+- [x] **Deployed on Railway** (project `soundcheck`, services `soundcheck` + `Redis`): https://soundcheck-production-0c8e.up.railway.app . Deploy with `railway up --service soundcheck --ci`. Variables set: QLOO_MOCK=1, REDIS_URL=${{Redis.REDIS_URL}}, NODE_ENV. Still to set: ANTHROPIC_API_KEY (the user must run `railway variable set ANTHROPIC_API_KEY=<key> --service soundcheck`; the agent is not permitted to search the machine for credentials), QLOO_API_KEY (then QLOO_MOCK=0). `/api/health` reports backend, mode and which seeded plans are persisted. Seeded demos are generated on first request if missing (`src/lib/ensureSeed.ts`).
 
 ## Pending: week 1 musician demo (Oct 14 to 19)
 - [x] Agent loop, scoring, routing, landing, plan page, map tour, persistence (session 2)
@@ -94,7 +94,7 @@ Findings from building the Qloo layer against the live docs on 2026-10-12. Each 
 - Repo private until the public README is written. Devpost rules (verified 2026-10-11) require a public repo with a visible license at submission; nothing requires it public during the build.
 
 ## Open questions
-- Which three specific acts to seed? Pick acts with large, well-documented fanbases so Qloo data is deep. Decide on key day after checking coverage.
+- Seeded acts chosen 2026-10-12: Khruangbin (artist, North America), Nate Bargatze (comedian, North America), The Rest Is History (podcast, UK and Ireland). Revisit on key day if coverage is thin.
 - KV choice: Upstash Redis (Marketplace) vs Vercel KV. Pick whichever provisions fastest.
 
 ## Next session starts here
