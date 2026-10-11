@@ -14,6 +14,7 @@ Entry for the [Qloo Agentic Hackathon](https://qloo.devpost.com/). Deadline Oct 
 | [`docs/STATUS.md`](docs/STATUS.md) | Session handoff tracker. Start here. |
 | [`docs/PLAN.md`](docs/PLAN.md) | Strategy, architecture, schedule, verification |
 | [`docs/UX.md`](docs/UX.md) | Screens, layouts, visual direction |
+| [`docs/STACK.md`](docs/STACK.md) | Engineering stack choices and rationale |
 | [`docs/RESEARCH.md`](docs/RESEARCH.md) | Hackathon rules, Qloo API mapping, judging, prior winners |
 
 ## License

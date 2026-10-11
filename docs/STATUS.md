@@ -1,7 +1,7 @@
 # STATUS
 
 Session handoff tracker for Soundcheck. Update this file at the end of every session so the next agent can start cold.
-Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `docs/PLAN.md` (strategy, architecture, schedule) → `docs/UX.md` (screens and visual direction) → this file.
+Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `docs/PLAN.md` (strategy, architecture, schedule) → `docs/UX.md` (screens and visual direction) → `docs/STACK.md` (stack choices) → this file.
 
 **Deadline:** Oct 30, 2026, 11:45 pm ET. Submit by Oct 29.
 
@@ -10,7 +10,7 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
 
 ## Done
 - [x] Research handoff written (`docs/RESEARCH.md`)
-- [x] Build plan written (`docs/PLAN.md` + `docs/UX.md`): strategy changes, UI screens, architecture, 19-day schedule, verification
+- [x] Build plan written (`docs/PLAN.md` + `docs/UX.md` + `docs/STACK.md`): strategy changes, UI screens, architecture, 19-day schedule, verification
 - [x] Git repo initialised, MIT `LICENSE`, `.gitignore`, pushed to GitHub (private for now)
 
 ## In progress
@@ -68,7 +68,7 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
 - Static curated city pools per region; Qloo locality search only for custom cities.
 - Nearest-neighbor routing with 1 travel day between stops.
 - Print-to-PDF via styled page, not a PDF library.
-- Repo private until the README split is done.
+- Repo private until the public README is written. Devpost rules (verified 2026-10-11) require a public repo with a visible license at submission; nothing requires it public during the build.
 
 ## Open questions
 - Which three specific acts to seed? Pick acts with large, well-documented fanbases so Qloo data is deep. Decide on key day after checking coverage.
