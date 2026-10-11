@@ -1,0 +1,47 @@
+/* Map tour motion. Only transform and opacity animate (the progress ring's dashoffset is set from JS each frame).
+   Easings and durations are the design-system tokens in globals.css. */
+
+/* The card: entrance 16px up over --dur-base, exit by opacity in --dur-fast, keyed off data-phase. */
+.tc-card { opacity: 0; transform: translateY(16px); transition: opacity var(--dur-fast) linear, transform 0s linear var(--dur-fast); }
+.tc-card[data-phase="out"] { opacity: 0; transform: none; transition: opacity var(--dur-fast) linear; }
+.tc-card[data-phase="card"], .tc-card[data-phase="detail"], .tc-card[data-phase="hold"] {
+  opacity: 1; transform: none;
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
+}
+
+/* Rows fade in 60 ms apart once the bar starts to fill. */
+.tc-row { opacity: 0; transform: translateY(6px); transition: opacity var(--dur-fast) linear, transform 0s linear var(--dur-fast); }
+.tc-card[data-phase="detail"] .tc-row, .tc-card[data-phase="hold"] .tc-row {
+  opacity: 1; transform: none;
+  transition: opacity var(--dur-base) var(--ease-out) calc(var(--i, 0) * 60ms), transform var(--dur-base) var(--ease-out) calc(var(--i, 0) * 60ms);
+}
+
+/* Audience bar: a full-width fill scaled from the left, after the number has landed. */
+.tc-fill { transform-origin: left center; transform: scaleX(0); transition: transform var(--dur-fast) linear; }
+.tc-card[data-phase="detail"] .tc-fill, .tc-card[data-phase="hold"] .tc-fill { transform: scaleX(1); transition: transform 400ms var(--ease-in-out); }
+
+/* Header city name cross-fades when the stop changes. */
+@keyframes tour-fade { from { opacity: 0; } to { opacity: 1; } }
+.tour-fade { animation: tour-fade var(--dur-base) var(--ease-out) both; }
+
+/* Progress dots. */
+.tc-dot { display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); transition: background var(--dur-fast) var(--ease-out), transform var(--dur-base) var(--ease-out); }
+.tc-dot[data-state="done"] { background: var(--spot); }
+.tc-dot[data-state="cur"] { background: var(--spot); transform: scale(1.5); box-shadow: var(--shadow-glow); }
+.tc-dot[data-untapped="true"] { outline: 1px solid var(--signal); outline-offset: 1px; }
+
+/* Buttons in the control bar. */
+.tc-ib { transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+.tc-ib:hover { background: var(--bg-sunken); }
+.tc-ib:active { transform: scale(0.96); }
+
+/* Mini quadrant: the ring glides between dots. */
+.tq-ring { transition: transform var(--dur-slow) var(--ease-in-out), opacity var(--dur-base) var(--ease-out); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tc-card { transform: none !important; }
+  .tc-row { transform: none !important; transition-delay: 0ms !important; }
+  .tc-fill { transition: none !important; }
+  .tq-ring { transition: opacity var(--dur-fast) linear; }
+  .tour-fade { animation-duration: var(--dur-fast); }
+}

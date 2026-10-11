@@ -6,21 +6,23 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
 **Deadline:** Oct 30, 2026, 11:45 pm ET. Submit by Oct 29.
 
 ## Last updated
-2026-10-12 (session 2)
+2026-10-12 (session 2, end)
 
 ## Done
 - [x] Research handoff written (`docs/RESEARCH.md`)
 - [x] Build plan written (`docs/PLAN.md` + `docs/UX.md` + `docs/STACK.md`): strategy changes, UI screens, architecture, 19-day schedule, verification
 - [x] Soundcheck Design System published (Claude Design artifact): tokens for Stage/Print themes, brand book, 13 components incl. animated TourCard, TourControls, MotionPrimitives, plus a Motion section in the brand book. Link in `docs/UX.md`.
 - [x] Map tour (presentation mode) and app-wide motion specified in `docs/UX.md` screen 4 and the Motion section
+- [x] **Session 2 build (2026-10-12), all four workstreams integrated, typecheck + 100 tests + lint + `pnpm build` green:**
+  - Qloo tool layer `src/lib/qloo/**` from the live hackathon docs: client with retries and URL cache (Upstash or memory), redaction, tolerant zod schemas, live client for 10 call types with fallbacks, deterministic mock (QLOO_MOCK=1), city pools for 3 regions (`src/data/cities`)
+  - Agent loop `src/lib/agent/**`: AI SDK tool calling on `claude-sonnet-5-5` with a coverage guard; runs deterministically with no ANTHROPIC_API_KEY (step marked "degraded"); scoring, routing, CSV, store (Upstash or memory + `.cache/plans`), seeds; `POST /api/plan` streams NDJSON PlanEvents; `GET /api/plan/[id]`, `/csv`
+  - UI `src/components/{ui,plan}`, `/`, `/run`, `/plan/[id]`, `/plan/[id]/print`, built from the design system (screenshots were checked)
+  - Map + tour `src/components/{map,tour}`, `src/lib/tour`, `/plan/[id]/tour`: MapLibre on OpenFreeMap positron recolored to tokens, progressive route, bloom, pulse, 6 s beat sequencer with exact pause/seek, keyboard, reduced motion, finale (verified in headless Chrome, GIF recorded)
+  - Mock-mode seeding works: `QLOO_MOCK=1 pnpm dlx tsx scripts/seed.ts` writes demo-musician / demo-comedian / demo-podcast to `.cache/plans`
 - [x] Git repo initialised, MIT `LICENSE`, `.gitignore`, pushed to GitHub (private for now)
 
-## In progress (session 2, four parallel agents, disjoint ownership)
-- Qloo tool layer (`src/lib/qloo/**`, `src/data/cities/**`) built from the live hackathon docs; mock client for QLOO_MOCK=1
-- Agent loop + API (`src/lib/agent/**`, `src/lib/score.ts`, `src/lib/routing.ts`, `src/lib/store.ts`, `src/lib/csv.ts`, `src/lib/seeds.ts`, `src/app/api/**`, `scripts/seed.ts`)
-- UI shell (`src/components/ui`, `src/components/plan`, `src/app/page.tsx`, `src/app/run`, `src/app/plan/[id]/page.tsx`, print view)
-- Map + tour (`src/components/map/**`, `src/components/tour/**`, `src/lib/tour/**`, `src/app/plan/[id]/tour`)
-- Cross-workstream contracts: `src/lib/qloo/contract.ts`, `src/lib/store.ts` exports, `src/components/map/PlanMap.tsx` props, `PlanEvent` NDJSON stream from POST /api/plan
+## In progress
+- (nothing; next session picks up from "Next session starts here")
 
 ## Pending: admin (do these first, they take days to clear)
 - [x] Requested Qloo hackathon API key on 2026-10-12 (expected within a day or two). Build runs with QLOO_MOCK=1 until it lands.
@@ -47,20 +49,17 @@ Findings from building the Qloo layer against the live docs on 2026-10-12. Each 
 - [x] Next.js 16.4 scaffolded (App Router, TypeScript, Tailwind v4, src/, pnpm). Note: this Next.js has breaking changes; read `AGENTS.md` and `node_modules/next/dist/docs/` before writing app code.
 - [x] Installed ai, @ai-sdk/anthropic, zod, @upstash/redis, maplibre-gl, d3-scale, nanoid, vitest
 - [x] `.env.example` written; `src/app/globals.css` carries the design tokens; `src/lib/types.ts` is the shared Plan schema; `src/fixtures/plan.sample.json` is the synthetic demo plan (validated by a vitest test)
-- [ ] `lib/qloo/client.ts` (base URL `https://hackathon.api.qloo.com`, `X-Api-Key`, retry, cache by URL)
-- [ ] `lib/qloo/tools/*.ts` typed tools with `{ status: ok|empty|partial|degraded|error, data, meta }` envelope
-- [ ] `lib/qloo/mock.ts` synthetic fixtures (hand-written shapes only, never real Qloo responses)
-- [ ] `data/cities/{na,uk-ie,eu}.json` curated metro pools with lat/lon
-- [ ] Vercel project linked, env vars set, first deploy
+- [x] Qloo client, tools, mock, city pools (see session 2 above)
+- [ ] Vercel project linked, env vars set (ANTHROPIC_API_KEY, QLOO_API_KEY, QLOO_MOCK, UPSTASH_*), first deploy. Without Upstash, plans live only in memory on serverless; provision Upstash Redis via the Vercel Marketplace.
 
 ## Pending: week 1 musician demo (Oct 14 to 19)
-- [ ] Agent loop (`lib/agent/run.ts`) with step guard and coverage checklist, streaming to UI
-- [ ] Heatmap scoring over city pool, `lib/score.ts` underserved score
-- [ ] Demographics, trending, routing (`lib/routing.ts`)
-- [ ] Landing page with 3 seeded demo cards + custom form
-- [ ] Plan page: map, quadrant chart, route strip, city cards, agent trace rail
-- [ ] Map tour page (`/plan/[id]/tour`): sequencer, progressive route, heatmap bloom, TourCard, TourControls, keyboard, reduced motion
-- [ ] Shareable `/plan/[id]` persistence
+- [x] Agent loop, scoring, routing, landing, plan page, map tour, persistence (session 2)
+- [ ] Run the agent loop with a real ANTHROPIC_API_KEY once and read the model-written `whyHere` / `suggestion` copy; tune `src/lib/agent/prompts.ts`
+- [ ] Act search autocomplete on the landing form via `/search` (currently a plain text input)
+- [ ] `/plan/<unknown>` returns 200 with not-found UI (id read inside Suspense); acceptable, or move notFound() outside the boundary
+- [ ] Plan-page hover on quadrant dots flies the map (debounced 140 ms); decide whether hover should only highlight and click should fly
+- [ ] Routing can include a "reach" city when few cities clear affinity 0.7 (comedian demo stop 1 was Spokane, reach); consider requiring affinity ≥ 0.6 before falling back
+- [ ] Tour card "why" popovers; tile pre-warming (no MapLibre prefetch API); bloom reads as a field only once real heatmap cells arrive
 - [ ] On key arrival: swap mocks for live, test comedian + podcast + author coverage, note findings here
 
 ## Pending: week 2 depth and breadth (Oct 20 to 25)
@@ -98,7 +97,9 @@ Findings from building the Qloo layer against the live docs on 2026-10-12. Each 
 - KV choice: Upstash Redis (Marketplace) vs Vercel KV. Pick whichever provisions fastest.
 
 ## Next session starts here
-1. Do the admin checklist above (key, Devpost, Discord).
-2. Optional: Design canvas artboards (plan page, landing, city card) built on the design system, for the user to approve the look before code.
-3. Scaffold Next.js and the mock tool layer (day 0 to 2 list); pull tokens from the design system into Tailwind theme config.
+1. `pnpm install && QLOO_MOCK=1 pnpm dlx tsx scripts/seed.ts && QLOO_MOCK=1 pnpm dev`, open /plan/demo-musician and /plan/demo-musician/tour to see the current state.
+2. If the Qloo key has arrived: run the key-day checklist above first.
+3. Deploy a Vercel preview (link project, set env vars, provision Upstash) so there is a live URL early.
+4. Then the week 1 list: real-model copy tuning, act autocomplete, the small UI issues above.
+5. Update this file before ending the session.
 3. Update this file before ending the session.

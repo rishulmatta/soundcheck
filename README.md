@@ -7,6 +7,17 @@ Entry for the [Qloo Agentic Hackathon](https://qloo.devpost.com/). Deadline Oct 
 
 > This README is a placeholder. The judge-facing version (problem, Qloo workflows, request-to-result walkthrough, setup, limitations) is written in the final week. See `docs/STATUS.md`.
 
+## Run locally
+
+```
+pnpm install
+cp .env.example .env.local        # QLOO_MOCK=1 runs on synthetic data until a Qloo key is set
+QLOO_MOCK=1 pnpm dlx tsx scripts/seed.ts   # writes the three demo plans to .cache/plans
+QLOO_MOCK=1 pnpm dev
+```
+
+Open `/plan/demo-musician` for a finished plan, `/plan/demo-musician/tour` for the self-running map tour, `/run?demo=1` for a replayed live run. `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`.
+
 ## Docs
 
 | File | What it is |
