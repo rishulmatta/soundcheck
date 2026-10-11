@@ -55,15 +55,19 @@ async function readStored(id: string): Promise<Plan | null> {
   }
 }
 
-export async function getPlan(id: string): Promise<Plan | null> {
+/** A stored plan only (memory, Redis or file). No fixture fallback: seed-on-demand uses this. */
+export async function getStoredPlan(id: string): Promise<Plan | null> {
   if (!isValidPlanId(id)) return null;
   const hit = memory.get(id);
   if (hit) return hit;
   const stored = await readStored(id);
-  if (stored) {
-    memory.set(id, stored);
-    return stored;
-  }
+  if (stored) memory.set(id, stored);
+  return stored;
+}
+
+export async function getPlan(id: string): Promise<Plan | null> {
+  const stored = await getStoredPlan(id);
+  if (stored) return stored;
   if (id === "demo-musician") return parsePlan(sample);
   return null;
 }

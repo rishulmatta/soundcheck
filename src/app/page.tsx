@@ -1,6 +1,7 @@
 import sample from "@/fixtures/plan.sample.json";
 import type { Plan } from "@/lib/types";
 import { SEEDED_PLAN_IDS } from "@/lib/store";
+import { SEEDS } from "@/lib/seeds";
 import { DemoCard, type DemoCardData } from "@/components/plan/DemoCard";
 import { LandingForm } from "@/components/plan/LandingForm";
 import { projectPlan, seededRoute } from "@/components/plan/RouteSketch";
@@ -9,40 +10,24 @@ import { REGION_LABEL } from "@/components/plan/format";
 const musician = sample as unknown as Plan;
 const sketch = projectPlan(musician);
 
-/**
- * Descriptors for the three seeded plans. The musician is read from the sample fixture; the comedian and podcast
- * descriptors are placeholders until their plans are seeded (they match the shape in docs/UX.md).
- */
-const DEMOS: Record<(typeof SEEDED_PLAN_IDS)[number], DemoCardData> = {
-  "demo-musician": {
-    id: "demo-musician",
-    kind: "Musician",
-    name: musician.act.name,
-    region: REGION_LABEL[musician.input.region],
-    stops: musician.stops.length,
-    window: musician.input.window ?? "Jan–Mar 2027",
-    route: sketch.route,
-    heat: sketch.heat,
-  },
-  "demo-comedian": {
-    id: "demo-comedian",
-    kind: "Comedian",
-    name: "The Example Comic",
-    region: "North America",
-    stops: 10,
-    window: "Jan–Mar 2027",
-    route: seededRoute("demo-comedian", 10),
-  },
-  "demo-podcast": {
-    id: "demo-podcast",
-    kind: "Live podcast",
-    name: "The Example Show",
-    region: "US + Canada",
-    stops: 8,
-    window: "Apr–Jun 2027",
-    route: seededRoute("demo-podcast", 8),
-  },
-};
+const KIND: Record<string, string> = { artist: "Musician", person: "Comedian", podcast: "Live podcast" };
+
+/** Descriptors for the three seeded plans, driven by src/lib/seeds.ts. The musician card's sketch comes from the sample fixture. */
+const DEMOS = Object.fromEntries(
+  SEEDS.map((seed) => [
+    seed.id,
+    {
+      id: seed.id,
+      kind: KIND[seed.input.actType] ?? "Act",
+      name: seed.input.actQuery,
+      region: REGION_LABEL[seed.input.region],
+      stops: seed.input.stops,
+      window: seed.input.window ?? "2027",
+      route: seed.id === "demo-musician" ? sketch.route : seededRoute(seed.id, seed.input.stops),
+      heat: seed.id === "demo-musician" ? sketch.heat : undefined,
+    } satisfies DemoCardData,
+  ]),
+) as Record<(typeof SEEDED_PLAN_IDS)[number], DemoCardData>;
 
 export default function Home() {
   return (

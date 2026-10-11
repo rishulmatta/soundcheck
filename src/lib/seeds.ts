@@ -1,6 +1,7 @@
 /**
- * The three seeded demos shown on the landing page. Act names are placeholders until key day,
- * when they are swapped for real acts with deep Qloo coverage (see docs/STATUS.md open questions).
+ * The three seeded demos shown on the landing page. Real, well-known touring acts chosen for deep Qloo coverage and
+ * for the judges' worlds (live music, stand-up, live podcast). In mock mode the names only label synthetic data.
+ * Swap them on key day if Qloo coverage for any of them turns out thin.
  */
 import type { PlanInput } from "@/lib/types";
 import type { SEEDED_PLAN_IDS } from "@/lib/store";
@@ -14,9 +15,9 @@ export interface Seed {
 export const SEEDS: Seed[] = [
   {
     id: "demo-musician",
-    label: "Indie band, North America",
+    label: "Band, North America",
     input: {
-      actQuery: "The Example Band",
+      actQuery: "Khruangbin",
       actType: "artist",
       region: "north-america",
       stops: 10,
@@ -29,7 +30,7 @@ export const SEEDS: Seed[] = [
     id: "demo-comedian",
     label: "Stand-up comedian, North America",
     input: {
-      actQuery: "Example Comedian",
+      actQuery: "Nate Bargatze",
       actType: "person",
       region: "north-america",
       stops: 8,
@@ -42,7 +43,7 @@ export const SEEDS: Seed[] = [
     id: "demo-podcast",
     label: "Live podcast, UK and Ireland",
     input: {
-      actQuery: "The Example Podcast",
+      actQuery: "The Rest Is History",
       actType: "podcast",
       region: "uk-ireland",
       stops: 6,
