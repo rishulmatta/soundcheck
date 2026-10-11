@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+/* Soundcheck tokens. Source of truth: the Soundcheck Design System artifact (docs/UX.md). Stage (dark) is the product; Print (light) is the PDF export only. */
+:root {
+  color-scheme: dark;
+  --bg: #121110; --bg-raised: #1b1917; --bg-sunken: #0c0b0a;
+  --line: #2b2825; --line-strong: #403b36;
+  --ink: #f4efe6; --ink-muted: #a69e92; --ink-faint: #6b645b;
+  --spot: #f2a93b; --spot-soft: #3a2a12; --on-spot: #121110;
+  --signal: #7cc9ea; --signal-soft: #13303d; --signal-glow: #7cc9ea66;
+  --ok: #5ad091; --ok-soft: #143224;
+  --warn: #f0907a; --warn-soft: #3d1f18;
+  --danger: #ff6b5b; --danger-soft: #3f1915;
+  --focus: #7cc9ea;
+  --map-water: #0c0b0a; --map-land: #161412; --map-label: #6b645b;
+  --route: var(--spot);
+  --quadrant-untapped: var(--signal); --quadrant-established: var(--ink-muted); --quadrant-reach: var(--ink-faint);
+  --shadow-popover: 0 8px 24px #00000080; --shadow-glow: 0 0 24px #7cc9ea66;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 64px;
+  --radius-sm: 2px; --radius-md: 4px; --radius-pill: 999px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1); --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 150ms; --dur-base: 300ms; --dur-slow: 600ms; --dur-camera: 1400ms; --dur-fit: 1600ms;
+}
+:root[data-theme="print"] {
+  color-scheme: light;
+  --bg: #f7f4ee; --bg-raised: #ffffff; --bg-sunken: #eeeae2;
+  --line: #dcd5ca; --line-strong: #b9b0a3;
+  --ink: #1a1715; --ink-muted: #5f584f; --ink-faint: #8c8478;
+  --spot: #b4620a; --spot-soft: #fbe9cf; --on-spot: #ffffff;
+  --signal: #0f6f94; --signal-soft: #d9eef7; --signal-glow: #0f6f9433;
+  --ok: #1f7a4d; --ok-soft: #dcf3e6; --warn: #a8432b; --warn-soft: #fbe3dc; --danger: #b3261e; --danger-soft: #fbdcd8;
+  --focus: #0f6f94; --map-water: #e3ded5; --map-land: #f1ede6; --map-label: #8c8478;
+  --shadow-popover: 0 8px 24px #1a171526; --shadow-glow: 0 0 16px #0f6f9433;
+}
+
+@theme inline {
+  --color-bg: var(--bg); --color-bg-raised: var(--bg-raised); --color-bg-sunken: var(--bg-sunken);
+  --color-line: var(--line); --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink); --color-ink-muted: var(--ink-muted); --color-ink-faint: var(--ink-faint);
+  --color-spot: var(--spot); --color-spot-soft: var(--spot-soft); --color-on-spot: var(--on-spot);
+  --color-signal: var(--signal); --color-signal-soft: var(--signal-soft);
+  --color-ok: var(--ok); --color-ok-soft: var(--ok-soft); --color-warn: var(--warn); --color-warn-soft: var(--warn-soft); --color-danger: var(--danger); --color-danger-soft: var(--danger-soft);
+  --color-focus: var(--focus);
+  --font-display: var(--font-barlow-condensed), "Arial Narrow", sans-serif;
+  --font-sans: var(--font-plex-sans), "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, Menlo, monospace;
+  --radius-sm: 2px; --radius-md: 4px; --radius-pill: 999px;
+  --shadow-popover: var(--shadow-popover); --shadow-glow: var(--shadow-glow);
+}
+
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-sans); font-size: 15px; line-height: 22px; margin: 0; }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.label { font: 600 11px/16px var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-muted); }
+.disp { font-family: var(--font-display); font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}

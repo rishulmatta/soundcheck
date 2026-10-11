@@ -1,0 +1,1682 @@
+{
+ "id": "demo-musician",
+ "createdAt": "2026-10-12T00:00:00Z",
+ "input": {
+  "actQuery": "The Example Band",
+  "actId": "ent-example-band",
+  "actType": "artist",
+  "region": "north-america",
+  "stops": 10,
+  "window": "Jan–Mar 2027",
+  "lockedCities": [],
+  "excludedCities": []
+ },
+ "act": {
+  "id": "ent-example-band",
+  "name": "The Example Band",
+  "type": "artist",
+  "subtype": "indie rock",
+  "popularity": 0.78,
+  "tasteTags": [
+   "indie rock",
+   "shoegaze",
+   "dream pop",
+   "vinyl",
+   "craft beer"
+  ]
+ },
+ "momentum": {
+  "trend": "rising",
+  "velocity": 0.42,
+  "weeks": 8,
+  "status": "ok"
+ },
+ "candidates": [
+  {
+   "id": "boise",
+   "name": "Boise",
+   "country": "US",
+   "lat": 43.62,
+   "lon": -116.21,
+   "metroM": 0.8,
+   "affinity": 0.91,
+   "popularity": 0.22,
+   "affinityRank": 1,
+   "underserved": 0.86,
+   "quadrant": "untapped",
+   "status": "ok"
+  },
+  {
+   "id": "chicago",
+   "name": "Chicago",
+   "country": "US",
+   "lat": 41.88,
+   "lon": -87.63,
+   "metroM": 9.5,
+   "affinity": 0.88,
+   "popularity": 0.9,
+   "affinityRank": 2,
+   "underserved": 0.57,
+   "quadrant": "established",
+   "status": "ok"
+  },
+  {
+   "id": "denver",
+   "name": "Denver",
+   "country": "US",
+   "lat": 39.74,
+   "lon": -104.99,
+   "metroM": 3,
+   "affinity": 0.86,
+   "popularity": 0.66,
+   "affinityRank": 3,
+   "underserved": 0.65,
+   "quadrant": "established",
+   "status": "ok"
+  },
+  {
+   "id": "new-york",
+   "name": "New York",
+   "country": "US",
+   "lat": 40.71,
+   "lon": -74.01,
+   "metroM": 20.1,
+   "affinity": 0.85,
+   "popularity": 0.97,
+   "affinityRank": 4,
+   "underserved": 0.52,
+   "quadrant": "established",
+   "status": "ok"
+  },
+  {
+   "id": "seattle",
+   "name": "Seattle",
+   "country": "US",
+   "lat": 47.61,
+   "lon": -122.33,
+   "metroM": 4,
+   "affinity": 0.84,
+   "popularity": 0.71,
+   "affinityRank": 5,
+   "underserved": 0.62,
+   "quadrant": "established",
+   "status": "ok"
+  },
+  {
+   "id": "austin",
+   "name": "Austin",
+   "country": "US",
+   "lat": 30.27,
+   "lon": -97.74,
+   "metroM": 2.4,
+   "affinity": 0.83,
+   "popularity": 0.74,
+   "affinityRank": 6,
+   "underserved": 0.6,
+   "quadrant": "established",
+   "status": "ok"
+  },
+  {
+   "id": "omaha",
+   "name": "Omaha",
+   "country": "US",
+   "lat": 41.26,
+   "lon": -95.94,
+   "metroM": 1,
+   "affinity": 0.82,
+   "popularity": 0.19,
+   "affinityRank": 7,
+   "underserved": 0.82,
+   "quadrant": "untapped",
+   "status": "ok"
+  },
+  {
+   "id": "los-angeles",
+   "name": "Los Angeles",
+   "country": "US",
+   "lat": 34.05,
+   "lon": -118.24,
+   "metroM": 13.2,
+   "affinity": 0.81,
+   "popularity": 0.95,
+   "affinityRank": 8,
+   "underserved": 0.51,
+   "quadrant": "established",
+   "status": "ok"
+  },
+  {
+   "id": "minneapolis",
+   "name": "Minneapolis",
+   "country": "US",
+   "lat": 44.98,
+   "lon": -93.27,
+   "metroM": 3.7,
+   "affinity": 0.8,
+   "popularity": 0.58,
+   "affinityRank": 9,
+   "underserved": 0.65,
+   "quadrant": "established",
+   "status": "ok"
+  },
+  {
+   "id": "salt-lake-city",
+   "name": "Salt Lake City",
+   "country": "US",
+   "lat": 40.76,
+   "lon": -111.89,
+   "metroM": 1.3,
+   "affinity": 0.79,
+   "popularity": 0.34,
+   "affinityRank": 10,
+   "underserved": 0.74,
+   "quadrant": "untapped",
+   "status": "ok"
+  },
+  {
+   "id": "tulsa",
+   "name": "Tulsa",
+   "country": "US",
+   "lat": 36.15,
+   "lon": -95.99,
+   "metroM": 1,
+   "affinity": 0.78,
+   "popularity": 0.17,
+   "affinityRank": 11,
+   "underserved": 0.8,
+   "quadrant": "untapped",
+   "status": "ok"
+  },
+  {
+   "id": "nashville",
+   "name": "Nashville",
+   "country": "US",
+   "lat": 36.16,
+   "lon": -86.78,
+   "metroM": 2,
+   "affinity": 0.76,
+   "popularity": 0.62,
+   "affinityRank": 12,
+   "underserved": 0.61,
+   "quadrant": "established",
+   "status": "ok"
+  },
+  {
+   "id": "toronto",
+   "name": "Toronto",
+   "country": "CA",
+   "lat": 43.65,
+   "lon": -79.38,
+   "metroM": 6.4,
+   "affinity": 0.74,
+   "popularity": 0.8,
+   "affinityRank": 13,
+   "underserved": 0.52,
+   "quadrant": "established",
+   "status": "ok"
+  },
+  {
+   "id": "pittsburgh",
+   "name": "Pittsburgh",
+   "country": "US",
+   "lat": 40.44,
+   "lon": -79.99,
+   "metroM": 2.4,
+   "affinity": 0.52,
+   "popularity": 0.41,
+   "affinityRank": 14,
+   "underserved": 0.55,
+   "quadrant": "reach",
+   "status": "ok"
+  },
+  {
+   "id": "atlanta",
+   "name": "Atlanta",
+   "country": "US",
+   "lat": 33.75,
+   "lon": -84.39,
+   "metroM": 6.1,
+   "affinity": 0.49,
+   "popularity": 0.7,
+   "affinityRank": 15,
+   "underserved": 0.41,
+   "quadrant": "reach",
+   "status": "ok"
+  },
+  {
+   "id": "phoenix",
+   "name": "Phoenix",
+   "country": "US",
+   "lat": 33.45,
+   "lon": -112.07,
+   "metroM": 4.9,
+   "affinity": 0.44,
+   "popularity": 0.55,
+   "affinityRank": 16,
+   "underserved": 0.44,
+   "quadrant": "reach",
+   "status": "ok"
+  }
+ ],
+ "stops": [
+  {
+   "order": 1,
+   "city": {
+    "id": "seattle",
+    "name": "Seattle",
+    "country": "US",
+    "lat": 47.61,
+    "lon": -122.33,
+    "metroM": 4,
+    "affinity": 0.84,
+    "popularity": 0.71,
+    "affinityRank": 5,
+    "underserved": 0.62,
+    "quadrant": "established",
+    "status": "ok"
+   },
+   "legDays": 0,
+   "demographics": {
+    "age": [
+     {
+      "bucket": "24_and_younger",
+      "score": 0.31
+     },
+     {
+      "bucket": "25_to_29",
+      "score": 0.62
+     },
+     {
+      "bucket": "30_to_34",
+      "score": 0.88
+     },
+     {
+      "bucket": "35_to_44",
+      "score": 0.3
+     },
+     {
+      "bucket": "45_to_54",
+      "score": -0.18
+     },
+     {
+      "bucket": "55_and_older",
+      "score": -0.42
+     }
+    ],
+    "gender": {
+     "female": 0.58,
+     "male": 0.42
+    },
+    "status": "ok"
+   },
+   "openers": [
+    {
+     "id": "op-harbor-lights",
+     "name": "Harbor Lights",
+     "overlap": 0.71,
+     "reason": "Shares 71% of the act's fanbase in Seattle per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    },
+    {
+     "id": "op-dry-pines",
+     "name": "Dry Pines",
+     "overlap": 0.64,
+     "reason": "Shares 64% of the act's fanbase in Seattle per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    }
+   ],
+   "sponsors": [
+    {
+     "id": "br-rove-outdoors",
+     "name": "Rove Outdoors",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Seattle.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-northline-coffee",
+     "name": "Northline Coffee",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Seattle.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-halftone-audio",
+     "name": "Halftone Audio",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Seattle.",
+     "tags": [
+      "lifestyle"
+     ]
+    }
+   ],
+   "places": [
+    {
+     "id": "pl-seattle-1",
+     "name": "Seattle Union Hall",
+     "reason": "Afterparty: late-night, live music tags, popularity above 0.5.",
+     "tags": [
+      "afterparty",
+      "bar"
+     ]
+    },
+    {
+     "id": "pl-seattle-2",
+     "name": "Seattle Record Exchange",
+     "reason": "Pop-up: record store with in-store events.",
+     "tags": [
+      "pop-up",
+      "record store"
+     ]
+    }
+   ],
+   "suggestion": "1,800-cap hall",
+   "whyHere": "Seattle ranks 5 of 16 for affinity with the act and sits on the route between stops."
+  },
+  {
+   "order": 2,
+   "city": {
+    "id": "boise",
+    "name": "Boise",
+    "country": "US",
+    "lat": 43.62,
+    "lon": -116.21,
+    "metroM": 0.8,
+    "affinity": 0.91,
+    "popularity": 0.22,
+    "affinityRank": 1,
+    "underserved": 0.86,
+    "quadrant": "untapped",
+    "status": "ok"
+   },
+   "legDays": 2,
+   "demographics": {
+    "age": [
+     {
+      "bucket": "24_and_younger",
+      "score": 0.31
+     },
+     {
+      "bucket": "25_to_29",
+      "score": 0.62
+     },
+     {
+      "bucket": "30_to_34",
+      "score": 0.88
+     },
+     {
+      "bucket": "35_to_44",
+      "score": 0.3
+     },
+     {
+      "bucket": "45_to_54",
+      "score": -0.18
+     },
+     {
+      "bucket": "55_and_older",
+      "score": -0.42
+     }
+    ],
+    "gender": {
+     "female": 0.58,
+     "male": 0.42
+    },
+    "status": "ok"
+   },
+   "openers": [
+    {
+     "id": "op-harbor-lights",
+     "name": "Harbor Lights",
+     "overlap": 0.71,
+     "reason": "Shares 71% of the act's fanbase in Boise per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    },
+    {
+     "id": "op-still-water",
+     "name": "Still Water",
+     "overlap": 0.64,
+     "reason": "Shares 64% of the act's fanbase in Boise per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    }
+   ],
+   "sponsors": [
+    {
+     "id": "br-northline-coffee",
+     "name": "Northline Coffee",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Boise.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-halftone-audio",
+     "name": "Halftone Audio",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Boise.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-meridian-cycles",
+     "name": "Meridian Cycles",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Boise.",
+     "tags": [
+      "lifestyle"
+     ]
+    }
+   ],
+   "places": [
+    {
+     "id": "pl-boise-1",
+     "name": "Boise Union Hall",
+     "reason": "Afterparty: late-night, live music tags, popularity above 0.5.",
+     "tags": [
+      "afterparty",
+      "bar"
+     ]
+    },
+    {
+     "id": "pl-boise-2",
+     "name": "Boise Record Exchange",
+     "reason": "Pop-up: record store with in-store events.",
+     "tags": [
+      "pop-up",
+      "record store"
+     ]
+    }
+   ],
+   "suggestion": "1,200-cap room, early announce",
+   "whyHere": "Fans of the act over-index 4.1× in Boise against the national baseline, and no comparable act has played within 300 miles."
+  },
+  {
+   "order": 3,
+   "city": {
+    "id": "salt-lake-city",
+    "name": "Salt Lake City",
+    "country": "US",
+    "lat": 40.76,
+    "lon": -111.89,
+    "metroM": 1.3,
+    "affinity": 0.79,
+    "popularity": 0.34,
+    "affinityRank": 10,
+    "underserved": 0.74,
+    "quadrant": "untapped",
+    "status": "ok"
+   },
+   "legDays": 1,
+   "demographics": {
+    "age": [
+     {
+      "bucket": "24_and_younger",
+      "score": 0.31
+     },
+     {
+      "bucket": "25_to_29",
+      "score": 0.62
+     },
+     {
+      "bucket": "30_to_34",
+      "score": 0.88
+     },
+     {
+      "bucket": "35_to_44",
+      "score": 0.3
+     },
+     {
+      "bucket": "45_to_54",
+      "score": -0.18
+     },
+     {
+      "bucket": "55_and_older",
+      "score": -0.42
+     }
+    ],
+    "gender": {
+     "female": 0.58,
+     "male": 0.42
+    },
+    "status": "ok"
+   },
+   "openers": [
+    {
+     "id": "op-still-water",
+     "name": "Still Water",
+     "overlap": 0.71,
+     "reason": "Shares 71% of the act's fanbase in Salt Lake City per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    },
+    {
+     "id": "op-copper-choir",
+     "name": "Copper Choir",
+     "overlap": 0.64,
+     "reason": "Shares 64% of the act's fanbase in Salt Lake City per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    }
+   ],
+   "sponsors": [
+    {
+     "id": "br-halftone-audio",
+     "name": "Halftone Audio",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Salt Lake City.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-meridian-cycles",
+     "name": "Meridian Cycles",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Salt Lake City.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-slate-spirits",
+     "name": "Slate Spirits",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Salt Lake City.",
+     "tags": [
+      "lifestyle"
+     ]
+    }
+   ],
+   "places": [
+    {
+     "id": "pl-salt-lake-city-1",
+     "name": "Salt Lake City Union Hall",
+     "reason": "Afterparty: late-night, live music tags, popularity above 0.5.",
+     "tags": [
+      "afterparty",
+      "bar"
+     ]
+    },
+    {
+     "id": "pl-salt-lake-city-2",
+     "name": "Salt Lake City Record Exchange",
+     "reason": "Pop-up: record store with in-store events.",
+     "tags": [
+      "pop-up",
+      "record store"
+     ]
+    }
+   ],
+   "suggestion": "1,200-cap room, early announce",
+   "whyHere": "Salt Lake City ranks 10 of 16 for affinity with the act and sits on the route between stops."
+  },
+  {
+   "order": 4,
+   "city": {
+    "id": "denver",
+    "name": "Denver",
+    "country": "US",
+    "lat": 39.74,
+    "lon": -104.99,
+    "metroM": 3,
+    "affinity": 0.86,
+    "popularity": 0.66,
+    "affinityRank": 3,
+    "underserved": 0.65,
+    "quadrant": "established",
+    "status": "ok"
+   },
+   "legDays": 2,
+   "demographics": {
+    "age": [
+     {
+      "bucket": "24_and_younger",
+      "score": 0.31
+     },
+     {
+      "bucket": "25_to_29",
+      "score": 0.62
+     },
+     {
+      "bucket": "30_to_34",
+      "score": 0.88
+     },
+     {
+      "bucket": "35_to_44",
+      "score": 0.3
+     },
+     {
+      "bucket": "45_to_54",
+      "score": -0.18
+     },
+     {
+      "bucket": "55_and_older",
+      "score": -0.42
+     }
+    ],
+    "gender": {
+     "female": 0.58,
+     "male": 0.42
+    },
+    "status": "ok"
+   },
+   "openers": [
+    {
+     "id": "op-copper-choir",
+     "name": "Copper Choir",
+     "overlap": 0.71,
+     "reason": "Shares 71% of the act's fanbase in Denver per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    },
+    {
+     "id": "op-dry-pines",
+     "name": "Dry Pines",
+     "overlap": 0.64,
+     "reason": "Shares 64% of the act's fanbase in Denver per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    }
+   ],
+   "sponsors": [
+    {
+     "id": "br-rove-outdoors",
+     "name": "Rove Outdoors",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Denver.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-northline-coffee",
+     "name": "Northline Coffee",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Denver.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-halftone-audio",
+     "name": "Halftone Audio",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Denver.",
+     "tags": [
+      "lifestyle"
+     ]
+    }
+   ],
+   "places": [
+    {
+     "id": "pl-denver-1",
+     "name": "Denver Union Hall",
+     "reason": "Afterparty: late-night, live music tags, popularity above 0.5.",
+     "tags": [
+      "afterparty",
+      "bar"
+     ]
+    },
+    {
+     "id": "pl-denver-2",
+     "name": "Denver Record Exchange",
+     "reason": "Pop-up: record store with in-store events.",
+     "tags": [
+      "pop-up",
+      "record store"
+     ]
+    }
+   ],
+   "suggestion": "1,800-cap hall",
+   "whyHere": "Denver ranks 3 of 16 for affinity with the act and sits on the route between stops."
+  },
+  {
+   "order": 5,
+   "city": {
+    "id": "omaha",
+    "name": "Omaha",
+    "country": "US",
+    "lat": 41.26,
+    "lon": -95.94,
+    "metroM": 1,
+    "affinity": 0.82,
+    "popularity": 0.19,
+    "affinityRank": 7,
+    "underserved": 0.82,
+    "quadrant": "untapped",
+    "status": "ok"
+   },
+   "legDays": 2,
+   "demographics": {
+    "age": [
+     {
+      "bucket": "24_and_younger",
+      "score": 0.31
+     },
+     {
+      "bucket": "25_to_29",
+      "score": 0.62
+     },
+     {
+      "bucket": "30_to_34",
+      "score": 0.88
+     },
+     {
+      "bucket": "35_to_44",
+      "score": 0.3
+     },
+     {
+      "bucket": "45_to_54",
+      "score": -0.18
+     },
+     {
+      "bucket": "55_and_older",
+      "score": -0.42
+     }
+    ],
+    "gender": {
+     "female": 0.58,
+     "male": 0.42
+    },
+    "status": "ok"
+   },
+   "openers": [
+    {
+     "id": "op-dry-pines",
+     "name": "Dry Pines",
+     "overlap": 0.71,
+     "reason": "Shares 71% of the act's fanbase in Omaha per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    },
+    {
+     "id": "op-late-signal",
+     "name": "Late Signal",
+     "overlap": 0.64,
+     "reason": "Shares 64% of the act's fanbase in Omaha per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    }
+   ],
+   "sponsors": [
+    {
+     "id": "br-northline-coffee",
+     "name": "Northline Coffee",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Omaha.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-halftone-audio",
+     "name": "Halftone Audio",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Omaha.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-meridian-cycles",
+     "name": "Meridian Cycles",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Omaha.",
+     "tags": [
+      "lifestyle"
+     ]
+    }
+   ],
+   "places": [
+    {
+     "id": "pl-omaha-1",
+     "name": "Omaha Union Hall",
+     "reason": "Afterparty: late-night, live music tags, popularity above 0.5.",
+     "tags": [
+      "afterparty",
+      "bar"
+     ]
+    },
+    {
+     "id": "pl-omaha-2",
+     "name": "Omaha Record Exchange",
+     "reason": "Pop-up: record store with in-store events.",
+     "tags": [
+      "pop-up",
+      "record store"
+     ]
+    }
+   ],
+   "suggestion": "1,200-cap room, early announce",
+   "whyHere": "Omaha ranks fifth of 38 for affinity but sits near the bottom for popularity: a primed room nobody has booked."
+  },
+  {
+   "order": 6,
+   "city": {
+    "id": "minneapolis",
+    "name": "Minneapolis",
+    "country": "US",
+    "lat": 44.98,
+    "lon": -93.27,
+    "metroM": 3.7,
+    "affinity": 0.8,
+    "popularity": 0.58,
+    "affinityRank": 9,
+    "underserved": 0.65,
+    "quadrant": "established",
+    "status": "ok"
+   },
+   "legDays": 1,
+   "demographics": {
+    "age": [
+     {
+      "bucket": "24_and_younger",
+      "score": 0.31
+     },
+     {
+      "bucket": "25_to_29",
+      "score": 0.62
+     },
+     {
+      "bucket": "30_to_34",
+      "score": 0.88
+     },
+     {
+      "bucket": "35_to_44",
+      "score": 0.3
+     },
+     {
+      "bucket": "45_to_54",
+      "score": -0.18
+     },
+     {
+      "bucket": "55_and_older",
+      "score": -0.42
+     }
+    ],
+    "gender": {
+     "female": 0.58,
+     "male": 0.42
+    },
+    "status": "ok"
+   },
+   "openers": [
+    {
+     "id": "op-late-signal",
+     "name": "Late Signal",
+     "overlap": 0.71,
+     "reason": "Shares 71% of the act's fanbase in Minneapolis per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    },
+    {
+     "id": "op-harbor-lights",
+     "name": "Harbor Lights",
+     "overlap": 0.64,
+     "reason": "Shares 64% of the act's fanbase in Minneapolis per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    }
+   ],
+   "sponsors": [
+    {
+     "id": "br-halftone-audio",
+     "name": "Halftone Audio",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Minneapolis.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-meridian-cycles",
+     "name": "Meridian Cycles",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Minneapolis.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-slate-spirits",
+     "name": "Slate Spirits",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Minneapolis.",
+     "tags": [
+      "lifestyle"
+     ]
+    }
+   ],
+   "places": [
+    {
+     "id": "pl-minneapolis-1",
+     "name": "Minneapolis Union Hall",
+     "reason": "Afterparty: late-night, live music tags, popularity above 0.5.",
+     "tags": [
+      "afterparty",
+      "bar"
+     ]
+    },
+    {
+     "id": "pl-minneapolis-2",
+     "name": "Minneapolis Record Exchange",
+     "reason": "Pop-up: record store with in-store events.",
+     "tags": [
+      "pop-up",
+      "record store"
+     ]
+    }
+   ],
+   "suggestion": "1,800-cap hall",
+   "whyHere": "Minneapolis ranks 9 of 16 for affinity with the act and sits on the route between stops."
+  },
+  {
+   "order": 7,
+   "city": {
+    "id": "chicago",
+    "name": "Chicago",
+    "country": "US",
+    "lat": 41.88,
+    "lon": -87.63,
+    "metroM": 9.5,
+    "affinity": 0.88,
+    "popularity": 0.9,
+    "affinityRank": 2,
+    "underserved": 0.57,
+    "quadrant": "established",
+    "status": "ok"
+   },
+   "legDays": 1,
+   "demographics": {
+    "age": [
+     {
+      "bucket": "24_and_younger",
+      "score": 0.31
+     },
+     {
+      "bucket": "25_to_29",
+      "score": 0.62
+     },
+     {
+      "bucket": "30_to_34",
+      "score": 0.88
+     },
+     {
+      "bucket": "35_to_44",
+      "score": 0.3
+     },
+     {
+      "bucket": "45_to_54",
+      "score": -0.18
+     },
+     {
+      "bucket": "55_and_older",
+      "score": -0.42
+     }
+    ],
+    "gender": {
+     "female": 0.58,
+     "male": 0.42
+    },
+    "status": "ok"
+   },
+   "openers": [
+    {
+     "id": "op-copper-choir",
+     "name": "Copper Choir",
+     "overlap": 0.71,
+     "reason": "Shares 71% of the act's fanbase in Chicago per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    },
+    {
+     "id": "op-night-sketch",
+     "name": "Night Sketch",
+     "overlap": 0.64,
+     "reason": "Shares 64% of the act's fanbase in Chicago per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    }
+   ],
+   "sponsors": [
+    {
+     "id": "br-rove-outdoors",
+     "name": "Rove Outdoors",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Chicago.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-northline-coffee",
+     "name": "Northline Coffee",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Chicago.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-halftone-audio",
+     "name": "Halftone Audio",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Chicago.",
+     "tags": [
+      "lifestyle"
+     ]
+    }
+   ],
+   "places": [
+    {
+     "id": "pl-chicago-1",
+     "name": "Chicago Union Hall",
+     "reason": "Afterparty: late-night, live music tags, popularity above 0.5.",
+     "tags": [
+      "afterparty",
+      "bar"
+     ]
+    },
+    {
+     "id": "pl-chicago-2",
+     "name": "Chicago Record Exchange",
+     "reason": "Pop-up: record store with in-store events.",
+     "tags": [
+      "pop-up",
+      "record store"
+     ]
+    }
+   ],
+   "suggestion": "3,000-cap theater, two nights possible",
+   "whyHere": "Chicago ranks 2 of 16 for affinity with the act and sits on the route between stops."
+  },
+  {
+   "order": 8,
+   "city": {
+    "id": "nashville",
+    "name": "Nashville",
+    "country": "US",
+    "lat": 36.16,
+    "lon": -86.78,
+    "metroM": 2,
+    "affinity": 0.76,
+    "popularity": 0.62,
+    "affinityRank": 12,
+    "underserved": 0.61,
+    "quadrant": "established",
+    "status": "ok"
+   },
+   "legDays": 2,
+   "demographics": {
+    "age": [
+     {
+      "bucket": "24_and_younger",
+      "score": 0.31
+     },
+     {
+      "bucket": "25_to_29",
+      "score": 0.62
+     },
+     {
+      "bucket": "30_to_34",
+      "score": 0.88
+     },
+     {
+      "bucket": "35_to_44",
+      "score": 0.3
+     },
+     {
+      "bucket": "45_to_54",
+      "score": -0.18
+     },
+     {
+      "bucket": "55_and_older",
+      "score": -0.42
+     }
+    ],
+    "gender": {
+     "female": 0.58,
+     "male": 0.42
+    },
+    "status": "ok"
+   },
+   "openers": [
+    {
+     "id": "op-night-sketch",
+     "name": "Night Sketch",
+     "overlap": 0.71,
+     "reason": "Shares 71% of the act's fanbase in Nashville per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    },
+    {
+     "id": "op-still-water",
+     "name": "Still Water",
+     "overlap": 0.64,
+     "reason": "Shares 64% of the act's fanbase in Nashville per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    }
+   ],
+   "sponsors": [
+    {
+     "id": "br-northline-coffee",
+     "name": "Northline Coffee",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Nashville.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-halftone-audio",
+     "name": "Halftone Audio",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Nashville.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-meridian-cycles",
+     "name": "Meridian Cycles",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Nashville.",
+     "tags": [
+      "lifestyle"
+     ]
+    }
+   ],
+   "places": [
+    {
+     "id": "pl-nashville-1",
+     "name": "Nashville Union Hall",
+     "reason": "Afterparty: late-night, live music tags, popularity above 0.5.",
+     "tags": [
+      "afterparty",
+      "bar"
+     ]
+    },
+    {
+     "id": "pl-nashville-2",
+     "name": "Nashville Record Exchange",
+     "reason": "Pop-up: record store with in-store events.",
+     "tags": [
+      "pop-up",
+      "record store"
+     ]
+    }
+   ],
+   "suggestion": "1,800-cap hall",
+   "whyHere": "Nashville ranks 12 of 16 for affinity with the act and sits on the route between stops."
+  },
+  {
+   "order": 9,
+   "city": {
+    "id": "tulsa",
+    "name": "Tulsa",
+    "country": "US",
+    "lat": 36.15,
+    "lon": -95.99,
+    "metroM": 1,
+    "affinity": 0.78,
+    "popularity": 0.17,
+    "affinityRank": 11,
+    "underserved": 0.8,
+    "quadrant": "untapped",
+    "status": "ok"
+   },
+   "legDays": 1,
+   "demographics": {
+    "age": [
+     {
+      "bucket": "24_and_younger",
+      "score": 0.31
+     },
+     {
+      "bucket": "25_to_29",
+      "score": 0.62
+     },
+     {
+      "bucket": "30_to_34",
+      "score": 0.88
+     },
+     {
+      "bucket": "35_to_44",
+      "score": 0.3
+     },
+     {
+      "bucket": "45_to_54",
+      "score": -0.18
+     },
+     {
+      "bucket": "55_and_older",
+      "score": -0.42
+     }
+    ],
+    "gender": {
+     "female": 0.58,
+     "male": 0.42
+    },
+    "status": "ok"
+   },
+   "openers": [
+    {
+     "id": "op-late-signal",
+     "name": "Late Signal",
+     "overlap": 0.71,
+     "reason": "Shares 71% of the act's fanbase in Tulsa per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    },
+    {
+     "id": "op-dry-pines",
+     "name": "Dry Pines",
+     "overlap": 0.64,
+     "reason": "Shares 64% of the act's fanbase in Tulsa per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    }
+   ],
+   "sponsors": [
+    {
+     "id": "br-halftone-audio",
+     "name": "Halftone Audio",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Tulsa.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-meridian-cycles",
+     "name": "Meridian Cycles",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Tulsa.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-slate-spirits",
+     "name": "Slate Spirits",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Tulsa.",
+     "tags": [
+      "lifestyle"
+     ]
+    }
+   ],
+   "places": [
+    {
+     "id": "pl-tulsa-1",
+     "name": "Tulsa Union Hall",
+     "reason": "Afterparty: late-night, live music tags, popularity above 0.5.",
+     "tags": [
+      "afterparty",
+      "bar"
+     ]
+    },
+    {
+     "id": "pl-tulsa-2",
+     "name": "Tulsa Record Exchange",
+     "reason": "Pop-up: record store with in-store events.",
+     "tags": [
+      "pop-up",
+      "record store"
+     ]
+    }
+   ],
+   "suggestion": "1,200-cap room, early announce",
+   "whyHere": "Tulsa shares the act's audience profile with Austin at a fraction of the competition for the date."
+  },
+  {
+   "order": 10,
+   "city": {
+    "id": "austin",
+    "name": "Austin",
+    "country": "US",
+    "lat": 30.27,
+    "lon": -97.74,
+    "metroM": 2.4,
+    "affinity": 0.83,
+    "popularity": 0.74,
+    "affinityRank": 6,
+    "underserved": 0.6,
+    "quadrant": "established",
+    "status": "ok"
+   },
+   "legDays": 2,
+   "demographics": {
+    "age": [
+     {
+      "bucket": "24_and_younger",
+      "score": 0.31
+     },
+     {
+      "bucket": "25_to_29",
+      "score": 0.62
+     },
+     {
+      "bucket": "30_to_34",
+      "score": 0.88
+     },
+     {
+      "bucket": "35_to_44",
+      "score": 0.3
+     },
+     {
+      "bucket": "45_to_54",
+      "score": -0.18
+     },
+     {
+      "bucket": "55_and_older",
+      "score": -0.42
+     }
+    ],
+    "gender": {
+     "female": 0.58,
+     "male": 0.42
+    },
+    "status": "ok"
+   },
+   "openers": [
+    {
+     "id": "op-night-sketch",
+     "name": "Night Sketch",
+     "overlap": 0.71,
+     "reason": "Shares 71% of the act's fanbase in Austin per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    },
+    {
+     "id": "op-harbor-lights",
+     "name": "Harbor Lights",
+     "overlap": 0.64,
+     "reason": "Shares 64% of the act's fanbase in Austin per Qloo compare.",
+     "tags": [
+      "indie rock"
+     ]
+    }
+   ],
+   "sponsors": [
+    {
+     "id": "br-rove-outdoors",
+     "name": "Rove Outdoors",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Austin.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-northline-coffee",
+     "name": "Northline Coffee",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Austin.",
+     "tags": [
+      "lifestyle"
+     ]
+    },
+    {
+     "id": "br-halftone-audio",
+     "name": "Halftone Audio",
+     "reason": "Audience skews 25–34 and over-indexes with the act's fans in Austin.",
+     "tags": [
+      "lifestyle"
+     ]
+    }
+   ],
+   "places": [
+    {
+     "id": "pl-austin-1",
+     "name": "Austin Union Hall",
+     "reason": "Afterparty: late-night, live music tags, popularity above 0.5.",
+     "tags": [
+      "afterparty",
+      "bar"
+     ]
+    },
+    {
+     "id": "pl-austin-2",
+     "name": "Austin Record Exchange",
+     "reason": "Pop-up: record store with in-store events.",
+     "tags": [
+      "pop-up",
+      "record store"
+     ]
+    }
+   ],
+   "suggestion": "1,800-cap hall",
+   "whyHere": "Austin ranks 6 of 16 for affinity with the act and sits on the route between stops."
+  }
+ ],
+ "trace": [
+  {
+   "id": "resolve",
+   "name": "Resolve act",
+   "status": "ok",
+   "summary": "1 candidate confirmed",
+   "calls": [
+    {
+     "request": "GET /search?query=[act]&types=urn:entity:artist",
+     "status": "ok",
+     "ms": 212,
+     "cached": false
+    }
+   ],
+   "startedAt": 1760230000000,
+   "endedAt": 1760230000512
+  },
+  {
+   "id": "score",
+   "name": "Score 16 cities",
+   "status": "ok",
+   "summary": "heatmap ×16",
+   "calls": [
+    {
+     "request": "GET /v2/insights?filter.type=urn:heatmap&filter.location.query=Boise&signal.interests.entities=[act]",
+     "status": "ok",
+     "ms": 277,
+     "cached": false
+    },
+    {
+     "request": "GET /v2/insights?filter.type=urn:heatmap&filter.location.query=Chicago&signal.interests.entities=[act]",
+     "status": "ok",
+     "ms": 259,
+     "cached": false
+    },
+    {
+     "request": "GET /v2/insights?filter.type=urn:heatmap&filter.location.query=Denver&signal.interests.entities=[act]",
+     "status": "ok",
+     "ms": 256,
+     "cached": false
+    },
+    {
+     "request": "GET /v2/insights?filter.type=urn:heatmap&filter.location.query=New%20York&signal.interests.entities=[act]",
+     "status": "ok",
+     "ms": 295,
+     "cached": false
+    },
+    {
+     "request": "GET /v2/insights?filter.type=urn:heatmap&filter.location.query=Seattle&signal.interests.entities=[act]",
+     "status": "ok",
+     "ms": 203,
+     "cached": false
+    },
+    {
+     "request": "GET /v2/insights?filter.type=urn:heatmap&filter.location.query=Austin&signal.interests.entities=[act]",
+     "status": "ok",
+     "ms": 195,
+     "cached": false
+    },
+    {
+     "request": "GET /v2/insights?filter.type=urn:heatmap&filter.location.query=Omaha&signal.interests.entities=[act]",
+     "status": "ok",
+     "ms": 260,
+     "cached": false
+    },
+    {
+     "request": "GET /v2/insights?filter.type=urn:heatmap&filter.location.query=Los%20Angeles&signal.interests.entities=[act]",
+     "status": "ok",
+     "ms": 182,
+     "cached": false
+    },
+    {
+     "request": "GET /v2/insights?filter.type=urn:heatmap&filter.location.query=Minneapolis&signal.interests.entities=[act]",
+     "status": "ok",
+     "ms": 207,
+     "cached": false
+    },
+    {
+     "request": "GET /v2/insights?filter.type=urn:heatmap&filter.location.query=Salt%20Lake%20City&signal.interests.entities=[act]",
+     "status": "ok",
+     "ms": 280,
+     "cached": false
+    },
+    {
+     "request": "GET /v2/insights?filter.type=urn:heatmap&filter.location.query=Tulsa&signal.interests.entities=[act]",
+     "status": "ok",
+     "ms": 204,
+     "cached": false
+    },
+    {
+     "request": "GET /v2/insights?filter.type=urn:heatmap&filter.location.query=Nashville&signal.interests.entities=[act]",
+     "status": "ok",
+     "ms": 191,
+     "cached": false
+    },
+    {
+     "request": "GET /v2/insights?filter.type=urn:heatmap&filter.location.query=Toronto&signal.interests.entities=[act]",
+     "status": "ok",
+     "ms": 194,
+     "cached": false
+    },
+    {
+     "request": "GET /v2/insights?filter.type=urn:heatmap&filter.location.query=Pittsburgh&signal.interests.entities=[act]",
+     "status": "ok",
+     "ms": 268,
+     "cached": false
+    },
+    {
+     "request": "GET /v2/insights?filter.type=urn:heatmap&filter.location.query=Atlanta&signal.interests.entities=[act]",
+     "status": "ok",
+     "ms": 186,
+     "cached": false
+    },
+    {
+     "request": "GET /v2/insights?filter.type=urn:heatmap&filter.location.query=Phoenix&signal.interests.entities=[act]",
+     "status": "ok",
+     "ms": 187,
+     "cached": false
+    }
+   ],
+   "startedAt": 1760230000512,
+   "endedAt": 1760230004456
+  },
+  {
+   "id": "profile",
+   "name": "Profile markets",
+   "status": "ok",
+   "summary": "demographics ×10",
+   "calls": [
+    {
+     "request": "GET /v2/insights?filter.type=urn:demographics&signal.interests.entities=[act]",
+     "status": "ok",
+     "ms": 240,
+     "cached": false
+    }
+   ],
+   "startedAt": 1760230004456,
+   "endedAt": 1760230004996
+  },
+  {
+   "id": "momentum",
+   "name": "Check momentum",
+   "status": "ok",
+   "summary": "trending 8 weeks",
+   "calls": [
+    {
+     "request": "GET /v2/trending?filter.type=urn:entity:artist&signal.interests.entities=[act]&filter.start_date=2026-08-10&filter.end_date=2026-10-05",
+     "status": "ok",
+     "ms": 310,
+     "cached": false
+    }
+   ],
+   "startedAt": 1760230004996,
+   "endedAt": 1760230005606
+  },
+  {
+   "id": "route",
+   "name": "Route tour",
+   "status": "ok",
+   "summary": "10 stops, 14 travel days",
+   "calls": [],
+   "startedAt": 1760230005606,
+   "endedAt": 1760230005906
+  },
+  {
+   "id": "openers",
+   "name": "Openers and sponsors",
+   "status": "ok",
+   "summary": "artist ×10, compare ×20, brand ×10",
+   "calls": [
+    {
+     "request": "GET /v2/insights?filter.type=urn:entity:artist&signal.interests.entities=[act]&signal.location.query=Boise&filter.exclude.entities=[act]&take=10&feature.explainability=true",
+     "status": "ok",
+     "ms": 402,
+     "cached": false
+    },
+    {
+     "request": "GET /v2/analysis/compare?a.signal.interests.entities=[act]&b.signal.interests.entities=[opener]&filter.type=urn:entity:artist",
+     "status": "ok",
+     "ms": 288,
+     "cached": false
+    },
+    {
+     "request": "GET /v2/insights?filter.type=urn:entity:brand&signal.interests.entities=[act]&signal.demographics.age=25_to_29,30_to_34&take=10&feature.explainability=true",
+     "status": "ok",
+     "ms": 366,
+     "cached": false
+    }
+   ],
+   "startedAt": 1760230005906,
+   "endedAt": 1760230007262
+  },
+  {
+   "id": "places",
+   "name": "Local activations",
+   "status": "partial",
+   "summary": "place ×10, 2 cities thin",
+   "calls": [
+    {
+     "request": "GET /v2/tags?filter.query=afterparty",
+     "status": "ok",
+     "ms": 150,
+     "cached": false
+    },
+    {
+     "request": "GET /v2/insights?filter.type=urn:entity:place&signal.interests.entities=[act]&filter.location.query=Tulsa&filter.tags=[tags]&filter.popularity.min=0.5&take=10",
+     "status": "empty",
+     "ms": 290,
+     "cached": false
+    }
+   ],
+   "startedAt": 1760230007262,
+   "endedAt": 1760230008002
+  },
+  {
+   "id": "explain",
+   "name": "Explain picks",
+   "status": "ok",
+   "summary": "explainability on 40 picks",
+   "calls": [],
+   "startedAt": 1760230008002,
+   "endedAt": 1760230008302
+  }
+ ],
+ "summary": {
+  "qlooCallTypes": 10,
+  "qlooCalls": 24,
+  "untappedStops": 4,
+  "overallStatus": "partial"
+ }
+}
