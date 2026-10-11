@@ -52,6 +52,8 @@ See `docs/UX.md` for the screen-by-screen layouts, visual direction, and print/e
 
 ## Architecture
 
+Stack choices with rationale live in `docs/STACK.md`. File layout:
+
 ```
 app/
   page.tsx                    landing: 3 seeded demos, one click each, plus custom form
