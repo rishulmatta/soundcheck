@@ -1,5 +1,8 @@
 # Soundcheck UX and design
 
+**Design system (source of truth for tokens, type, components):** https://claude.ai/artifact/DKvPVuT6JumRtuxCKLdEbs
+Agents building UI read its `project/README.md` first, then `project/tokens.json`. The Scorefluent design system in the same account belongs to another app and is never used here.
+
 Guiding rule: it must look like a promoter's deliverable, not a chatbot. The agent is visible in a side rail, but the center of the screen is always the plan. Three screens plus a print view.
 
 **Visual direction:** dark "stage" theme (near-black background, one warm accent for the act, a cool accent for Qloo signals), condensed tour-poster display type for headings, tabular numerals for scores. Every number from Qloo carries a small "Qloo" tag so judges see provenance at a glance. Mobile stacks everything in the same order.

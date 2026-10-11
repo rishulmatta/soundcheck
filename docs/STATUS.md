@@ -6,11 +6,12 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
 **Deadline:** Oct 30, 2026, 11:45 pm ET. Submit by Oct 29.
 
 ## Last updated
-2026-10-11 (session 1)
+2026-10-12 (session 2)
 
 ## Done
 - [x] Research handoff written (`docs/RESEARCH.md`)
 - [x] Build plan written (`docs/PLAN.md` + `docs/UX.md` + `docs/STACK.md`): strategy changes, UI screens, architecture, 19-day schedule, verification
+- [x] Soundcheck Design System published (Claude Design artifact): tokens for Stage/Print themes, brand book, 10 components, cover. Link in `docs/UX.md`.
 - [x] Git repo initialised, MIT `LICENSE`, `.gitignore`, pushed to GitHub (private for now)
 
 ## In progress
@@ -76,5 +77,6 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
 
 ## Next session starts here
 1. Do the admin checklist above (key, Devpost, Discord).
-2. Scaffold Next.js and the mock tool layer (day 0 to 2 list).
+2. Optional: Design canvas artboards (plan page, landing, city card) built on the design system, for the user to approve the look before code.
+3. Scaffold Next.js and the mock tool layer (day 0 to 2 list); pull tokens from the design system into Tailwind theme config.
 3. Update this file before ending the session.
