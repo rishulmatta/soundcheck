@@ -53,10 +53,10 @@ function create(): StringKV | null {
     // Lazy require keeps ioredis out of client bundles and out of test runs that never touch Redis.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { Redis } = require("ioredis") as typeof import("ioredis");
+    // Commands issued before the socket opens are queued (ioredis default), so the first request after boot is not lost.
+    // maxRetriesPerRequest keeps a dead Redis from hanging callers; they fall back to memory after two retries.
     const client = new Redis(redisUrl, {
-      lazyConnect: true,
       maxRetriesPerRequest: 2,
-      enableOfflineQueue: false,
       connectTimeout: 5000,
       tls: redisUrl.startsWith("rediss://") ? {} : undefined,
     });
@@ -66,7 +66,6 @@ function create(): StringKV | null {
       warned = true;
       console.warn(`[redis] ${err.message}`);
     });
-    client.connect().catch(() => undefined);
     return new IORedisKV(client);
   }
   const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
