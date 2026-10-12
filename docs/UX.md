@@ -108,7 +108,7 @@ The plan as a self-running show. One button on the plan header ("Play tour") and
 │ Stop 2 of 12 · BOISE                         │  ●◦   ·  ·      │    │
 │                                              │  ·  ·    ·  ·   │    │
 │          · ·  ·                              └─────────────────┘    │
-│       ·  ◉ ◉ ◉  ·        full-bleed map, dark basemap               │
+│       ·  ◉ ◉ ◉  ·        full-bleed map, light basemap               │
 │     ·  ◉ ◉②◉ ◉  ·        heatmap glow blooming around the stop      │
 │       ·  ◉ ◉ ◉  ·        route leg drawing in from stop ①           │
 │          · ·                                                        │
@@ -161,3 +161,7 @@ The full rules, easings and durations live in the design system's brand book (Mo
 ## Print view (`/plan/[id]/print`)
 
 Light theme, one city per page after a cover page with map and quadrant, no interactive elements. Browser "Save as PDF" produces the promoter deliverable. CSV is one row per stop with all scores, openers, sponsors, venues.
+
+## Map ground: light on dark (decided 2026-10-12)
+
+The basemap is a light, paper-like ground inside the dark Stage theme: land `--map-land` off-white, water `--map-water` pale slate, dark labels and borders. The user tested dark, mid and light grounds on the live tour and chose the lightest. Do not darken it again; tune the six `--map-*` tokens in `src/app/globals.css` (fallbacks in `src/components/map/basemap.ts`) if anything needs adjusting. The route (spot) and signal markers sit on this light ground, so any new marker colour must be checked against `--map-land`, not the page background.

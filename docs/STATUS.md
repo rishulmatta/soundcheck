@@ -17,7 +17,7 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
   - Qloo tool layer `src/lib/qloo/**` from the live hackathon docs: client with retries and URL cache (Upstash or memory), redaction, tolerant zod schemas, live client for 10 call types with fallbacks, deterministic mock (QLOO_MOCK=1), city pools for 3 regions (`src/data/cities`)
   - Agent loop `src/lib/agent/**`: AI SDK tool calling on `claude-sonnet-5-5` with a coverage guard; runs deterministically with no ANTHROPIC_API_KEY (step marked "degraded"); scoring, routing, CSV, store (Upstash or memory + `.cache/plans`), seeds; `POST /api/plan` streams NDJSON PlanEvents; `GET /api/plan/[id]`, `/csv`
   - UI `src/components/{ui,plan}`, `/`, `/run`, `/plan/[id]`, `/plan/[id]/print`, built from the design system (screenshots were checked)
-  - Map + tour `src/components/{map,tour}`, `src/lib/tour`, `/plan/[id]/tour`: MapLibre on OpenFreeMap positron recolored to tokens, progressive route, bloom, pulse, 6 s beat sequencer with exact pause/seek, keyboard, reduced motion, finale (verified in headless Chrome, GIF recorded)
+  - Map + tour `src/components/{map,tour}`, `src/lib/tour`, `/plan/[id]/tour`: MapLibre on OpenFreeMap positron recolored to tokens (light ground on the dark theme, chosen by the user 2026-10-12 after side-by-side tests; see UX.md), progressive route, bloom, pulse, 6 s beat sequencer with exact pause/seek, keyboard, reduced motion, finale (verified in headless Chrome, GIF recorded)
   - Mock-mode seeding works: `QLOO_MOCK=1 pnpm dlx tsx scripts/seed.ts` writes demo-musician / demo-comedian / demo-podcast to `.cache/plans`
 - [x] Git repo initialised, MIT `LICENSE`, `.gitignore`, pushed to GitHub (private for now)
 
