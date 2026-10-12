@@ -95,6 +95,8 @@ Findings from building the Qloo layer against the live docs on 2026-10-12. Each 
 
 - [x] **Act identity (2026-10-12):** the plan header and print cover show the resolved act's picture, a one-line description and "Confirm" links (Wikipedia, official site, Spotify, Apple Podcasts, YouTube, Instagram, X, IMDb). Fetched online at run time in `src/lib/actProfile.ts`: Qloo entity image / `external` ids first (live key), Wikipedia REST + Wikidata as the free fallback (works in mock mode). Cached in KV under `profile:v2:*`. Tests stub the lookup (`RunDeps.profile`). Stored plans without the fields parse fine (`links` defaults to []).
 
+- **Build cache gotcha (2026-10-12):** Turbopack's build filesystem cache served a stale `globals.css` chunk after a token-only change, both locally and on Railway (which persists `.next/cache`). `experimental.turbopackFileSystemCacheForBuild` is now `false` in `next.config.ts`. If a CSS change ever fails to show up on the live site, check the served chunk's values with curl before anything else.
+
 ## Open questions
 - Seeded acts chosen 2026-10-12: Khruangbin (artist, North America), Nate Bargatze (comedian, North America), The Rest Is History (podcast, UK and Ireland). Revisit on key day if coverage is thin.
 - KV choice: Upstash Redis (Marketplace) vs Vercel KV. Pick whichever provisions fastest.
