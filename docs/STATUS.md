@@ -93,7 +93,7 @@ Findings from building the Qloo layer against the live docs on 2026-10-12. Each 
 - Hosting and Redis on Railway (user's paid account); only free resources otherwise. No Vercel, no Upstash.
 - Repo private until the public README is written. Devpost rules (verified 2026-10-11) require a public repo with a visible license at submission; nothing requires it public during the build.
 
-- [x] **Act identity (2026-10-12):** the plan header and print cover show the resolved act's picture, a one-line description and "Confirm" links (Wikipedia, official site, Spotify, Apple Podcasts, YouTube, Instagram, X, IMDb). Fetched online at run time in `src/lib/actProfile.ts`: Qloo entity image / `external` ids first (live key), Wikipedia REST + Wikidata as the free fallback (works in mock mode). Cached in KV under `profile:v1:*`. Tests stub the lookup (`RunDeps.profile`). Stored plans without the fields parse fine (`links` defaults to []).
+- [x] **Act identity (2026-10-12):** the plan header and print cover show the resolved act's picture, a one-line description and "Confirm" links (Wikipedia, official site, Spotify, Apple Podcasts, YouTube, Instagram, X, IMDb). Fetched online at run time in `src/lib/actProfile.ts`: Qloo entity image / `external` ids first (live key), Wikipedia REST + Wikidata as the free fallback (works in mock mode). Cached in KV under `profile:v2:*`. Tests stub the lookup (`RunDeps.profile`). Stored plans without the fields parse fine (`links` defaults to []).
 
 ## Open questions
 - Seeded acts chosen 2026-10-12: Khruangbin (artist, North America), Nate Bargatze (comedian, North America), The Rest Is History (podcast, UK and Ireland). Revisit on key day if coverage is thin.

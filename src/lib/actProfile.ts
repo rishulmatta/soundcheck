@@ -110,13 +110,24 @@ async function fetchFromWikipedia(name: string, type: ActType, signal?: AbortSig
     );
     links.push(...linksFromWikidataClaims(wd?.entities?.[summary.wikibase_item]?.claims));
   }
-  const imageUrl = summary.thumbnail?.source ?? summary.originalimage?.source;
+  let imageUrl = summary.thumbnail?.source ?? summary.originalimage?.source;
+  if (!imageUrl) imageUrl = await artworkFromApple(links, signal);
   const description = firstSentence(summary.extract) ?? summary.description;
   if (!imageUrl && !description && links.length === 0) return null;
   return { imageUrl, description, links, source: "wikipedia" };
 }
 
-const cacheKey = (name: string, type: ActType) => `profile:v1:${type}:${name.trim().toLowerCase()}`;
+/** Podcasts rarely have a Wikipedia image; Apple's free lookup returns the show artwork for the Apple Podcasts id. */
+async function artworkFromApple(links: ActLink[], signal?: AbortSignal): Promise<string | undefined> {
+  const apple = links.find((l) => l.label === "Apple Podcasts");
+  const id = apple?.url.match(/id(\d+)$/)?.[1];
+  if (!id) return undefined;
+  const r = await getJson<{ results?: { artworkUrl600?: string; artworkUrl100?: string }[] }>(`https://itunes.apple.com/lookup?id=${id}`, signal);
+  const art = r?.results?.[0];
+  return art?.artworkUrl600 ?? art?.artworkUrl100;
+}
+
+const cacheKey = (name: string, type: ActType) => `profile:v2:${type}:${name.trim().toLowerCase()}`;
 
 /** Online lookup with KV cache. Null when nothing useful was found or the network is unavailable. */
 export async function fetchActProfile(name: string, type: ActType, signal?: AbortSignal): Promise<ActProfile | null> {
