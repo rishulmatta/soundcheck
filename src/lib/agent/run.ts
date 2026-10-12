@@ -13,7 +13,8 @@
 import { nanoid } from "nanoid";
 import { getQloo, type QlooClient, type RelatedEntity } from "@/lib/qloo";
 import { putPlan } from "@/lib/store";
-import { Plan, PlanInput, type CityPoolEntry, type CityScore, type Demographics, type Momentum, type Pick as PickT, type PlanEvent, type Stop, type ToolStatus } from "@/lib/types";
+import { fetchActProfile, type ActProfile } from "@/lib/actProfile";
+import { Plan, PlanInput, type ActType, type CityPoolEntry, type CityScore, type Demographics, type Momentum, type Pick as PickT, type PlanEvent, type Stop, type ToolStatus } from "@/lib/types";
 import { matchesCity } from "@/lib/routing";
 import { cityPoolFor, spreadPick } from "./pool";
 import { agentPrompt, AGENT_INSTRUCTIONS, withoutQlooPrompt } from "./prompts";
@@ -71,6 +72,8 @@ export interface RunDeps {
   /** Wall-clock budget for the agent loop before the guard takes over. */
   agentBudgetMs: number;
   withoutQloo: boolean;
+  /** Picture, description and links for the resolved act, fetched online. Defaults to fetchActProfile; tests stub it. */
+  profile: (name: string, type: ActType) => Promise<ActProfile | null>;
 }
 
 export interface RunOptions {
@@ -96,6 +99,8 @@ function resolveDeps(input: PlanInput, injected: Partial<RunDeps> = {}): RunDeps
     maxSteps: envInt("SOUNDCHECK_MAX_STEPS", 30),
     agentBudgetMs: envInt("SOUNDCHECK_AGENT_BUDGET_MS", 150_000),
     withoutQloo: process.env.SOUNDCHECK_WITHOUT_QLOO === "1",
+    // No network lookups inside the test runner.
+    profile: process.env.VITEST ? async () => null : fetchActProfile,
     ...Object.fromEntries(Object.entries(injected).filter(([k, v]) => v !== undefined && k !== "qloo" && k !== "model" && k !== "pool")),
   };
 }
@@ -386,7 +391,7 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
   const qloo = deps.qloo;
   const excluded = (c: CityPoolEntry) => input.excludedCities.some((k) => matchesCity(c, k));
   const tracer = new Tracer(emit, deps.now);
-  const ctx: RunContext = { input, qloo, pool: deps.pool.filter((c) => !excluded(c)), tracer, state: newRunState(), emit };
+  const ctx: RunContext = { input, qloo, pool: deps.pool.filter((c) => !excluded(c)), tracer, state: newRunState(), emit, profile: deps.profile };
 
   // 1. Agent loop.
   const inflight = new Set<Promise<unknown>>();
@@ -431,6 +436,9 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
     filledItems.add(item);
   });
   if (filled.length) tracer.end("guard", `Model skipped ${[...filledItems].join(", ")}; orchestrator ${filled.join("; ")}`);
+
+  // Picture, description and links for the act (started when the act resolved; bounded by its own timeouts).
+  await ctx.state.profilePromise;
 
   // 3. Stops and copy.
   const { state } = ctx;

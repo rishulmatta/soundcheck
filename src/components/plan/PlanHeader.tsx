@@ -7,6 +7,7 @@ import { QlooTag } from "@/components/ui/QlooTag";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { Check, Download, FileText, Link2, Play, Shuffle } from "@/components/ui/icons";
 import { ACT_TYPE_LABEL, planParams } from "./format";
+import { ActLinks, ActPortrait } from "./ActIdentity";
 
 const TREND = { rising: "▲ Rising", flat: "▬ Flat", falling: "▼ Falling", unknown: "Momentum unavailable" } as const;
 
@@ -57,15 +58,22 @@ export function PlanHeader({ plan, comparing, onToggleCompare }: { plan: Plan; c
   const subtype = act.subtype ? ` · ${act.subtype}` : "";
   return (
     <header className="flex flex-col gap-6 pb-2 pt-2 lg:flex-row lg:items-end lg:justify-between">
-      <div className="flex min-w-0 flex-col gap-3">
-        <p className="label">Tour plan</p>
-        <h1 className="font-display text-[44px] font-bold uppercase leading-[44px] tracking-[0.01em] sm:text-[64px] sm:leading-[60px]">{act.name}</h1>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[15px] leading-[22px]">
-          <span className="text-ink">{ACT_TYPE_LABEL[act.type]}{subtype}</span>
-          <StatusChip status="ok">verified entity</StatusChip>
-          <span className="num text-xs leading-4 text-ink-muted">Qloo ID {act.id}</span>
-        </div>
-        <p className="text-[15px] leading-[22px] text-ink-muted">{planParams(plan).join(" · ")}</p>
+      <div className="flex min-w-0 gap-5">
+        <ActPortrait act={act} size={96} className="mt-7 hidden sm:block" />
+        <div className="flex min-w-0 flex-col gap-3">
+          <p className="label">Tour plan</p>
+          <div className="flex items-start gap-4">
+            <ActPortrait act={act} size={64} className="sm:hidden" />
+            <h1 className="font-display text-[44px] font-bold uppercase leading-[44px] tracking-[0.01em] sm:text-[64px] sm:leading-[60px]">{act.name}</h1>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[15px] leading-[22px]">
+            <span className="text-ink">{ACT_TYPE_LABEL[act.type]}{subtype}</span>
+            <StatusChip status="ok">verified entity</StatusChip>
+            <span className="num text-xs leading-4 text-ink-muted">Qloo ID {act.id}</span>
+          </div>
+          {act.description && <p className="max-w-[60ch] text-[15px] leading-[22px] text-ink">{act.description}</p>}
+          <ActLinks act={act} />
+          <p className="text-[15px] leading-[22px] text-ink-muted">{planParams(plan).join(" · ")}</p>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] leading-[22px]">
           <span className="label">Momentum</span>
           <QlooTag />
@@ -82,6 +90,7 @@ export function PlanHeader({ plan, comparing, onToggleCompare }: { plan: Plan; c
               )}
             </>
           )}
+        </div>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 lg:justify-end">

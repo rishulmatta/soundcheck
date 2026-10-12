@@ -31,6 +31,7 @@ import {
   type TraceStep,
 } from "@/lib/types";
 import { scoreCities, type ScorableHeatmap } from "@/lib/score";
+import { mergeProfile, type ActProfile } from "@/lib/actProfile";
 import { matchesCity, routeTour } from "@/lib/routing";
 
 /* ------------------------------------------------------------------ tracer */
@@ -178,6 +179,8 @@ export interface RunState {
   actSearched: boolean;
   act?: Act;
   actResolved: boolean;
+  /** In-flight profile lookup (picture, description, links); see startActProfile. */
+  profilePromise?: Promise<void>;
   tasteTagsFetched: boolean;
   tasteTagRefs: TagRef[];
   seedTags: TagRef[];
@@ -233,6 +236,8 @@ export interface RunContext {
   tracer: Tracer;
   state: RunState;
   emit: (e: PlanEvent) => void;
+  /** Online act profile lookup (picture, description, links). Tests inject a stub. */
+  profile: (name: string, type: ActType) => Promise<ActProfile | null>;
 }
 
 /* ----------------------------------------------------------------- helpers */
@@ -316,8 +321,29 @@ function toAct(c: EntityCandidate, fallbackType: ActType): Act {
     subtype: c.subtype,
     popularity: typeof c.popularity === "number" ? clamp01(c.popularity) : undefined,
     imageUrl: imageOk ? c.imageUrl : undefined,
+    description: c.description,
+    links: (c.links ?? []).filter((l) => z.string().url().safeParse(l.url).success),
     tasteTags: [],
   });
+}
+
+/**
+ * Picture, description and links for the resolved act, fetched online (Qloo first, Wikipedia/Wikidata as fallback).
+ * Runs in the background: the act event is re-emitted once the profile lands, and runPlan awaits it before saving.
+ */
+export function startActProfile(ctx: RunContext): void {
+  const act = ctx.state.act;
+  if (!act || ctx.state.profilePromise) return;
+  ctx.state.profilePromise = ctx
+    .profile(act.name, act.type)
+    .then((profile) => {
+      const current = ctx.state.act;
+      if (!current || !profile) return;
+      const merged = mergeProfile({ imageUrl: current.imageUrl, description: current.description, links: current.links }, profile);
+      ctx.state.act = { ...current, ...merged };
+      ctx.emit({ type: "act", act: { ...ctx.state.act, tasteTags: [...ctx.state.act.tasteTags] } });
+    })
+    .catch(() => undefined);
 }
 
 /** Picks the candidate: explicit id, else input.actId, else exact name match, else the first result. */
@@ -335,6 +361,7 @@ export function confirmAct(ctx: RunContext, entityId?: string): { act?: Act; err
   ctx.state.act = toAct(pick, ctx.input.actType);
   ctx.state.actResolved = true;
   ctx.emit({ type: "act", act: { ...ctx.state.act, tasteTags: [...ctx.state.act.tasteTags] } });
+  startActProfile(ctx);
   ctx.tracer.end("resolve", `Resolved "${pick.name}" (${pick.hint})`);
   return { act: ctx.state.act };
 }
@@ -350,6 +377,7 @@ export async function ensureAct(ctx: RunContext): Promise<Act> {
   ctx.tracer.mark("resolve", "degraded");
   ctx.tracer.end("resolve", ctx.state.actResolved ? "Search empty; using the supplied Qloo id" : "No Qloo match; planning from taste tags only");
   ctx.emit({ type: "act", act: { ...ctx.state.act, tasteTags: [] } });
+  startActProfile(ctx);
   return ctx.state.act;
 }
 

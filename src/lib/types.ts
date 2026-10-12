@@ -43,6 +43,10 @@ export const PlanInput = z.object({
 });
 export type PlanInput = z.infer<typeof PlanInput>;
 
+/** An outbound link that lets the user confirm the act (Wikipedia, Spotify, official site, ...). */
+export const ActLink = z.object({ label: z.string(), url: z.string().url() });
+export type ActLink = z.infer<typeof ActLink>;
+
 export const Act = z.object({
   id: z.string(),
   name: z.string(),
@@ -50,6 +54,10 @@ export const Act = z.object({
   subtype: z.string().optional(),
   popularity: z.number().min(0).max(1).optional(),
   imageUrl: z.string().url().optional(),
+  /** One line about the act, from Qloo or Wikipedia, fetched at run time. */
+  description: z.string().optional(),
+  /** Confirmation links, fetched at run time (Qloo external ids first, then Wikipedia / Wikidata). */
+  links: z.array(ActLink).default([]),
   /** Qloo tag names describing the act's taste profile, e.g. ["indie rock", "shoegaze"]. */
   tasteTags: z.array(z.string()).default([]),
 });

@@ -7,6 +7,7 @@
  */
 import { z } from "zod";
 import type { ActType, CityPoolEntry } from "@/lib/types";
+import { linksFromQlooExternal } from "@/lib/actProfile";
 import type { CityHeatmap, CompareData, DemographicsData, EntityCandidate, HeatmapCell, RelatedEntity, TagRef, TrendingData } from "./contract";
 
 // ---------- helpers ----------
@@ -64,9 +65,12 @@ export const QlooEntitySchema = z
         .object({
           image: opt(z.object({ url: str }).passthrough()),
           short_description: str,
+          description: str,
+          website: str,
         })
         .passthrough(),
     ),
+    external: opt(z.record(z.string(), z.unknown())),
     tags: opt(z.array(z.unknown())),
     query: opt(
       z
@@ -248,6 +252,8 @@ export function toEntityCandidate(raw: unknown, type: ActType): EntityCandidate 
     subtype: tags[0] ?? e.subtype,
     popularity: e.popularity !== undefined ? clamp01(e.popularity) : undefined,
     imageUrl: e.properties?.image?.url ?? e.url,
+    description: e.properties?.short_description ?? e.short_description ?? e.properties?.description,
+    links: linksFromQlooExternal(e.external, e.properties?.website),
     hint,
   };
 }

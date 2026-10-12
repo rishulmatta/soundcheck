@@ -2,7 +2,7 @@
  * The Qloo tool contract. Implemented in src/lib/qloo (live client + mock), consumed by src/lib/agent.
  * Every method returns a ToolResult envelope; nothing throws on thin data. Only network/auth failures become status "error".
  */
-import type { ActType, CityPoolEntry, ToolResult } from "@/lib/types";
+import type { ActLink, ActType, CityPoolEntry, ToolResult } from "@/lib/types";
 
 export interface EntityCandidate {
   id: string;
@@ -11,6 +11,10 @@ export interface EntityCandidate {
   subtype?: string;
   popularity?: number;
   imageUrl?: string;
+  /** Qloo's short description, when the entity carries one. */
+  description?: string;
+  /** Links built from Qloo `external` ids and `properties.website`. */
+  links?: ActLink[];
   /** Short disambiguation line, e.g. "Artist · Indie rock · popularity 0.78". */
   hint: string;
 }

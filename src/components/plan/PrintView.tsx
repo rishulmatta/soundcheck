@@ -9,6 +9,7 @@ import { QuadrantChart } from "./QuadrantChart";
 import { RouteSketch, projectPlan } from "./RouteSketch";
 import { RouteStrip } from "./RouteStrip";
 import { ACT_TYPE_LABEL, formatDate, planParams } from "./format";
+import { ActLinks, ActPortrait } from "./ActIdentity";
 import "./print.css";
 
 const sheet = "print-sheet mx-auto w-full max-w-[820px] border border-line bg-bg-raised p-8 print:max-w-none print:border-0 print:p-0";
@@ -32,12 +33,17 @@ export function PrintView({ plan }: { plan: Plan }) {
       <div className="flex flex-col gap-6 print:gap-0">
         <section className={sheet} aria-label="Cover">
           <p className="label">Soundcheck · Tour plan</p>
-          <h1 className="mt-3 font-display text-[64px] font-bold uppercase leading-[60px] tracking-[0.01em]">{act.name}</h1>
+          <div className="mt-3 flex items-start gap-5">
+            <ActPortrait act={act} size={112} className="mt-2" />
+            <h1 className="font-display text-[64px] font-bold uppercase leading-[60px] tracking-[0.01em]">{act.name}</h1>
+          </div>
           <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] leading-[22px]">
             <span>{ACT_TYPE_LABEL[act.type]}{act.subtype ? ` · ${act.subtype}` : ""}</span>
             <StatusChip status="ok">verified entity</StatusChip>
             <span className="num text-xs text-ink-muted">Qloo ID {act.id}</span>
           </div>
+          {act.description && <p className="mt-2 max-w-[70ch] text-[15px] leading-[22px]">{act.description}</p>}
+          <ActLinks act={act} print className="mt-2" />
           <p className="mt-2 text-[15px] leading-[22px] text-ink-muted">{planParams(plan).join(" · ")}</p>
           <p className="mt-1 flex flex-wrap items-center gap-x-3 text-[15px] leading-[22px]">
             <span className="label">Momentum</span>
