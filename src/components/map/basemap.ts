@@ -24,12 +24,12 @@ export interface MapTokens {
 }
 
 const FALLBACK_TOKENS: MapTokens = {
-  water: "#1e2128",
-  land: "#534d45",
-  label: "#efe8dc",
-  coast: "#8d857a",
-  border: "#cbc2b4",
-  borderSoft: "#a39a8d",
+  water: "#c9cfd7",
+  land: "#f3efe8",
+  label: "#2b2825",
+  coast: "#a39b90",
+  border: "#5a534b",
+  borderSoft: "#8a8279",
   line: "#2b2825",
   lineStrong: "#403b36",
   spot: "#f2a93b",
