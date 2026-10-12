@@ -12,7 +12,7 @@
   --warn: #f0907a; --warn-soft: #3d1f18;
   --danger: #ff6b5b; --danger-soft: #3f1915;
   --focus: #7cc9ea;
-  --map-water: #0e1014; --map-land: #2e2a25; --map-label: #c9c1b4; --map-coast: #5a534b; --map-border: #938a7e; --map-border-soft: #6b635a;
+  --map-water: #1e2128; --map-land: #534d45; --map-label: #efe8dc; --map-coast: #8d857a; --map-border: #cbc2b4; --map-border-soft: #a39a8d;
   --route: var(--spot);
   --quadrant-untapped: var(--signal); --quadrant-established: var(--ink-muted); --quadrant-reach: var(--ink-faint);
   --shadow-popover: 0 8px 24px #00000080; --shadow-glow: 0 0 24px #7cc9ea66;
