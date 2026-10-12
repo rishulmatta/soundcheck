@@ -15,6 +15,8 @@ export interface RouteOptions {
   stops: number;
   locked: string[];
   excluded: string[];
+  /** Manual order of city ids. Used only when it lists exactly the selected cities; otherwise ignored. */
+  order?: string[];
 }
 
 export interface RouteResult {
@@ -106,10 +108,26 @@ function twoOpt(path: CityScore[]): CityScore[] {
   return p;
 }
 
+/** Travel days for a path, first stop 0. */
+export function legDaysAlong(path: { lat: number; lon: number }[]): number[] {
+  return path.map((c, i) => (i === 0 ? 0 : legDaysFor(haversineKm(path[i - 1], c))));
+}
+
+/** The manual order applied to the selected cities, or undefined when it does not list exactly those cities. */
+export function manualOrder(picked: CityScore[], order: string[] | undefined): CityScore[] | undefined {
+  if (!order || order.length !== picked.length) return undefined;
+  const out: CityScore[] = [];
+  for (const key of order) {
+    const hit = picked.find((c) => matchesCity(c, key));
+    if (!hit || out.includes(hit)) return undefined;
+    out.push(hit);
+  }
+  return out;
+}
+
 export function routeTour(cities: CityScore[], opts: RouteOptions): RouteResult {
   const { picked, start } = selectCities(cities, opts);
   if (!start || picked.length === 0) return { order: [], legDays: [] };
-  const order = twoOpt(nearestNeighbour(picked, start));
-  const legDays = order.map((c, i) => (i === 0 ? 0 : legDaysFor(haversineKm(order[i - 1], c))));
-  return { order, legDays };
+  const order = manualOrder(picked, opts.order) ?? twoOpt(nearestNeighbour(picked, start));
+  return { order, legDays: legDaysAlong(order) };
 }

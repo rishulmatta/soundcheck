@@ -45,8 +45,57 @@ export const PlanInput = z.object({
   lockedCities: z.array(z.string()).default([]),
   excludedCities: z.array(z.string()).default([]),
   budgetTier: BudgetTier.default("bus"),
+  /**
+   * Manual stop order as city ids, set when the user reorders the route by hand. Honoured by the router only when it
+   * lists exactly the routed cities; otherwise the router orders the tour itself.
+   */
+  order: z.array(z.string()).optional(),
 });
 export type PlanInput = z.infer<typeof PlanInput>;
+
+/**
+ * One edit to a finished plan, expressed as a change-set over its PlanInput. Cities are pool ids (see
+ * src/lib/revision.ts for resolving names). Every field is optional so a change-set composes: a "Drop" button
+ * adds to `drop`, the revise bar's model proposal fills several at once.
+ */
+export const ChangeSet = z.object({
+  /** City ids to add to lockedCities. */
+  lock: z.array(z.string()).default([]),
+  /** City ids to remove from lockedCities. */
+  unlock: z.array(z.string()).default([]),
+  /** City ids to add to excludedCities. The router fills the freed slot with the next best city. */
+  drop: z.array(z.string()).default([]),
+  /** City ids to remove from excludedCities. */
+  restore: z.array(z.string()).default([]),
+  stops: z.number().int().min(3).max(20).optional(),
+  window: z.string().optional(),
+  budgetTier: BudgetTier.optional(),
+  /** Manual order of the routed city ids; see PlanInput.order. */
+  order: z.array(z.string()).optional(),
+});
+export type ChangeSet = z.infer<typeof ChangeSet>;
+
+/** What the model proposes for a free-text revision request, before the user confirms it. */
+export const RevisionProposal = z.object({
+  changes: ChangeSet,
+  /** One line restating the request as the model understood it. */
+  note: z.string().max(300),
+  /** City names in the request that matched nothing in the pool. */
+  unmatched: z.array(z.string()).default([]),
+});
+export type RevisionProposal = z.infer<typeof RevisionProposal>;
+
+/** A revision run: the parent plan plus the change-set to apply to its input. The server derives the new PlanInput. */
+export const RevisionRequest = z.object({ parentId: z.string(), changes: ChangeSet });
+export type RevisionRequest = z.infer<typeof RevisionRequest>;
+
+/** Body of POST /api/plan and the sessionStorage hand-off to /run: an original input or a revision request. */
+export const RunRequest = z.union([RevisionRequest, PlanInput]);
+export type RunRequest = z.infer<typeof RunRequest>;
+
+export function isRevisionRequest(r: RunRequest): r is RevisionRequest {
+  return "parentId" in r && typeof r.parentId === "string";
+}
 
 /** An outbound link that lets the user confirm the act (Wikipedia, Spotify, official site, ...). */
 export const ActLink = z.object({ label: z.string(), url: z.string().url() });
@@ -171,6 +220,12 @@ export type TraceStep = z.infer<typeof TraceStep>;
 export const Plan = z.object({
   id: z.string(),
   createdAt: z.string(),
+  /** The plan this one was revised from. Absent on an original run. */
+  parentId: z.string().optional(),
+  /** 1 for an original run, parent.revision + 1 for a revision. */
+  revision: z.number().int().min(1).optional(),
+  /** One line naming what changed from the parent, e.g. "Dropped Tulsa · Locked Austin". */
+  revisionNote: z.string().optional(),
   input: PlanInput,
   act: Act,
   momentum: Momentum,

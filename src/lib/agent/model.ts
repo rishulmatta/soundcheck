@@ -7,9 +7,9 @@
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, isStepCount, Output, tool, type LanguageModelUsage, type ToolSet } from "ai";
 import { z } from "zod";
-import type { ModelUsage } from "@/lib/types";
+import { BudgetTier, type ModelUsage } from "@/lib/types";
 import type { AgentToolSpec } from "./tools";
-import { COPY_INSTRUCTIONS, WITHOUT_QLOO_INSTRUCTIONS } from "./prompts";
+import { COPY_INSTRUCTIONS, REVISE_INSTRUCTIONS, WITHOUT_QLOO_INSTRUCTIONS } from "./prompts";
 
 export const DEFAULT_MODEL_ID = "claude-sonnet-5-5";
 
@@ -25,6 +25,23 @@ export const WithoutQloo = z.object({
   note: z.string().max(600),
 });
 export type WithoutQloo = z.infer<typeof WithoutQloo>;
+
+/**
+ * The model's reading of a free-text revision request, in city names as written. The server resolves names against
+ * the pool (src/lib/revision.ts) and reports what did not match; the model never sees ids.
+ */
+export const RevisionDraft = z.object({
+  lock: z.array(z.string()).max(20).default([]),
+  unlock: z.array(z.string()).max(20).default([]),
+  drop: z.array(z.string()).max(20).default([]),
+  restore: z.array(z.string()).max(20).default([]),
+  stops: z.number().int().min(3).max(20).optional(),
+  window: z.string().max(60).optional(),
+  budgetTier: BudgetTier.optional(),
+  /** One line restating the request as understood, or what could not be done with these controls. */
+  note: z.string().max(300),
+});
+export type RevisionDraft = z.infer<typeof RevisionDraft>;
 
 export interface AgentLoopResult {
   steps: number;
@@ -69,6 +86,8 @@ export interface AgentModel {
   writeStopCopy(facts: Record<string, unknown>, signal?: AbortSignal, meter?: UsageMeter): Promise<StopCopy>;
   /** Plain-LLM plan for the "Without Qloo" toggle. */
   planWithoutQloo(prompt: string, signal?: AbortSignal, meter?: UsageMeter): Promise<WithoutQloo>;
+  /** Turn a free-text revision request into a RevisionDraft over the plan's controls. One small call. */
+  proposeRevision(prompt: string, signal?: AbortSignal, meter?: UsageMeter): Promise<RevisionDraft>;
 }
 
 function toToolSet(specs: AgentToolSpec[]): ToolSet {
@@ -132,6 +151,19 @@ export function createAnthropicModel(modelId: string = process.env.SOUNDCHECK_MO
       });
       meter?.add(result.totalUsage);
       return WithoutQloo.parse(result.output);
+    },
+    async proposeRevision(prompt, signal, meter) {
+      const result = await generateText({
+        model,
+        instructions: REVISE_INSTRUCTIONS,
+        prompt,
+        output: Output.object({ schema: RevisionDraft }),
+        abortSignal: signal,
+        maxRetries: 1,
+        providerOptions: { anthropic: { effort: "low", ...cache } },
+      });
+      meter?.add(result.totalUsage);
+      return RevisionDraft.parse(result.output);
     },
   };
 }

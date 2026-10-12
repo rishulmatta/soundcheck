@@ -1,5 +1,5 @@
 /** Prompts for the Soundcheck agent. Kept free of timestamps and per-request ids so the system prompt caches well. */
-import type { CityPoolEntry, PlanInput } from "@/lib/types";
+import type { CityPoolEntry, Plan, PlanInput } from "@/lib/types";
 
 /** Safe-use rules from the Qloo hackathon kit, applied to every model call. */
 export const SAFE_USE_RULES = `Safe-use rules (mandatory):
@@ -63,4 +63,20 @@ export function withoutQlooPrompt(input: PlanInput, pool: CityPoolEntry[]): stri
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+export const REVISE_INSTRUCTIONS = `You translate a promoter's request to change a finished tour plan into the plan's controls. The controls are:
+- lock: cities that must stay on the route; unlock: remove that guarantee.
+- drop: cities to take off the route (the planner fills the slot with the next best city); restore: allow a previously dropped city again.
+- stops: total number of stops (3 to 20); window: the touring window as free text; budgetTier: van, bus or production.
+Use city names exactly as they appear in the pool list you are given. A request for a city that is not in the pool cannot be done: say so in the note and leave it out. Requests outside these controls (venues, dates per city, specific openers) cannot be done either: say so in the note. Do not invent cities and do not change anything the request did not ask for. "Replace X with Y" means drop X and lock Y. "Shorter tour" without a number means the current stops minus two. Keep the note to one sentence.`;
+
+export function revisePrompt(plan: Pick<Plan, "input" | "stops" | "act">, pool: CityPoolEntry[], request: string): string {
+  const route = plan.stops.map((s) => `${s.order}. ${s.city.name}`).join("; ");
+  return [
+    `Act: ${plan.act.name}. Current route (${plan.stops.length} stops): ${route}.`,
+    `Current controls: stops ${plan.input.stops}; window ${plan.input.window ?? "unset"}; budgetTier ${plan.input.budgetTier}; locked: ${plan.input.lockedCities.join(", ") || "none"}; dropped: ${plan.input.excludedCities.join(", ") || "none"}.`,
+    `Pool (cities the planner can route): ${pool.map((c) => c.name).join(", ")}.`,
+    `Request: """${request.replace(/"""/g, '"').slice(0, 600)}"""`,
+  ].join("\n");
 }
