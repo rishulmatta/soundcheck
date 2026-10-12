@@ -105,6 +105,28 @@ Same layout as the finished plan, but the content fills in as the agent works. L
 - **Agent trace** collapses to a footer bar on the finished plan and expands to the full rail from Screen 2.
 - **Provenance footer** on every plan satisfies the kit's safe-use rules.
 
+### Editing the plan (added 2026-10-13)
+
+Soundcheck is a promoter's deliverable, not a chat. The user edits the plan itself; every edit becomes a constraint on the input; the agent re-runs only what changed. There is no chat thread and no floating message box.
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ ┌─ ② BOISE ─────────────────────────── Untapped  [Lock] [Drop] ─┐    │
+│ ROUTE  ⠿①Seattle →2d→ ⠿②Boise →1d→ ⠿③SLC …   Reordered by hand  Re-route│
+│ …                                                                    │
+├──────────────────────────────────────────────────────────────────────┤
+│ Revise: [ swap Tulsa for Austin, make it 9 stops      ] [Propose]    │
+│ Drop Tulsa ×  Lock Austin ×  Stops 10 → 9 ×   More ▸                 │
+│ Re-plans with Qloo from cache     [Discard]  [Re-run with 3 changes] │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+- **Card actions.** Each city card has Lock and Drop. Drop takes the city off the route and lets the router fill the slot with the next best city (it lands in `excludedCities`); Lock pins it for every later revision (`lockedCities`). Both are reversible chips until re-run.
+- **Drag to reorder** in the route strip. Pure client-side: stop numbers, travel days and the economics strip recompute instantly from geography, no model call. "Re-route" restores the agent's order. A reorder is saved as a revision like any other change, and a reorder-only revision is an instant, free clone of the parent (`PlanInput.order`).
+- **Revise bar**, docked at the bottom of the plan. One text field, not a thread. "Propose" sends the request to one small model call (`POST /api/plan/[id]/propose`) that translates it into the plan's controls (lock, drop, stops, window, budget tier) and returns a change-set plus a one-line reading of the request and any city names it could not find in the pool. Nothing runs until the user presses **Re-run**; the pending changes are shown as removable chips, so the model's output is a proposal the user edits, never a reply.
+- **Revisions are new plans.** Re-run creates a new plan id with `parentId`, `revision` and a `revisionNote` ("Drop Tulsa · Lock Austin"). The original share link never changes. The header shows "Revision 2, from revision 1" with a link back. A full revision skips the model's agent loop: the orchestrator applies the constraints, every Qloo answer comes from the cache, picks and city copy are carried over for stops whose neighbours did not change, and the model writes copy only for new or moved stops. Cost per revision is one small call plus one copy call per changed stop, against six calls for a fresh run.
+- **Why not a floating chat.** It is the most expensive option per interaction, it makes the demo read as a wrapper around a model, and it hides the structure that makes the plan auditable. A change-set with a visible diff still reads as agentic and keeps every change grounded in a Qloo-backed constraint.
+
 ## Screen 4: Map tour (presentation mode)
 
 The plan as a self-running show. One button on the plan header ("Play tour") and the `#tour` anchor on seeded demo links open it. Judges who click one link see the whole argument in about 80 seconds without reading anything. It is also the source of the Devpost hero video and GIF.

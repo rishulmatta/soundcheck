@@ -84,6 +84,35 @@ describe("routeTour", () => {
     expect(pathKm(order)).toBeLessThanOrEqual(pathKm(sweep) + 1);
   });
 
+  it("honours a manual order that lists exactly the selected cities", () => {
+    const order = ["tulsa", "boise", "omaha", "salt-lake-city"];
+    const r = routeTour(cities, { stops: 4, locked: [], excluded: [], order });
+    expect(r.order.map((c) => c.id)).toEqual(order);
+    expect(r.legDays[0]).toBe(0);
+    for (let i = 1; i < r.order.length; i++) expect(r.legDays[i]).toBe(legDaysFor(haversineKm(r.order[i - 1], r.order[i])));
+  });
+
+  it("matches manual order entries by name as well as id", () => {
+    const r = routeTour(cities, { stops: 4, locked: [], excluded: [], order: ["Tulsa", "boise", "Omaha", "Salt Lake City"] });
+    expect(r.order.map((c) => c.id)).toEqual(["tulsa", "boise", "omaha", "salt-lake-city"]);
+  });
+
+  it("ignores a manual order that misses a selected city, adds an unselected one, or repeats one", () => {
+    const auto = routeTour(cities, { stops: 4, locked: [], excluded: [] }).order.map((c) => c.id);
+    const missing = routeTour(cities, { stops: 4, locked: [], excluded: [], order: ["tulsa", "boise", "omaha"] });
+    const extra = routeTour(cities, { stops: 4, locked: [], excluded: [], order: ["tulsa", "boise", "omaha", "salt-lake-city", "denver"] });
+    const swapped = routeTour(cities, { stops: 4, locked: [], excluded: [], order: ["tulsa", "boise", "omaha", "denver"] });
+    const repeated = routeTour(cities, { stops: 4, locked: [], excluded: [], order: ["tulsa", "boise", "omaha", "omaha"] });
+    for (const r of [missing, extra, swapped, repeated]) expect(r.order.map((c) => c.id)).toEqual(auto);
+    expect(auto).not.toEqual(["tulsa", "boise", "omaha", "salt-lake-city"]);
+  });
+
+  it("ignores the manual order once a city in it is excluded", () => {
+    const r = routeTour(cities, { stops: 4, locked: [], excluded: ["omaha"], order: ["tulsa", "boise", "omaha", "salt-lake-city"] });
+    expect(r.order.map((c) => c.id)).not.toContain("omaha");
+    expect(r.order).toHaveLength(4);
+  });
+
   it("handles empty input", () => {
     expect(routeTour([], { stops: 5, locked: [], excluded: [] })).toEqual({ order: [], legDays: [] });
   });

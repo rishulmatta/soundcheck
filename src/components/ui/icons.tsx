@@ -62,3 +62,56 @@ export const Printer = ({ size }: { size?: number }) => (
     <path d="M7 14h10v6H7z" />
   </Svg>
 );
+export const Lock = ({ size }: { size?: number }) => (
+  <Svg size={size}>
+    <rect x="5" y="11" width="14" height="9" rx="2" />
+    <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+  </Svg>
+);
+export const Unlock = ({ size }: { size?: number }) => (
+  <Svg size={size}>
+    <rect x="5" y="11" width="14" height="9" rx="2" />
+    <path d="M8 11V8a4 4 0 0 1 7.5-1.9" />
+  </Svg>
+);
+export const X = ({ size }: { size?: number }) => (
+  <Svg size={size}>
+    <path d="M6 6l12 12M18 6 6 18" />
+  </Svg>
+);
+export const Trash = ({ size }: { size?: number }) => (
+  <Svg size={size}>
+    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3" />
+  </Svg>
+);
+export const GripVertical = ({ size }: { size?: number }) => (
+  <Svg size={size}>
+    <circle cx="9" cy="6" r="0.9" />
+    <circle cx="15" cy="6" r="0.9" />
+    <circle cx="9" cy="12" r="0.9" />
+    <circle cx="15" cy="12" r="0.9" />
+    <circle cx="9" cy="18" r="0.9" />
+    <circle cx="15" cy="18" r="0.9" />
+  </Svg>
+);
+export const ArrowUp = ({ size }: { size?: number }) => (
+  <Svg size={size}>
+    <path d="M12 19V5M6 11l6-6 6 6" />
+  </Svg>
+);
+export const ArrowDown = ({ size }: { size?: number }) => (
+  <Svg size={size}>
+    <path d="M12 5v14M6 13l6 6 6-6" />
+  </Svg>
+);
+export const Undo = ({ size }: { size?: number }) => (
+  <Svg size={size}>
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10a6 6 0 0 1 0 12h-3" />
+  </Svg>
+);
+export const ChevronDown = ({ size }: { size?: number }) => (
+  <Svg size={size}>
+    <path d="m6 9 6 6 6-6" />
+  </Svg>
+);

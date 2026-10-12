@@ -14,8 +14,9 @@ import { nanoid } from "nanoid";
 import { getQloo, type QlooClient, type RelatedEntity } from "@/lib/qloo";
 import { putPlan } from "@/lib/store";
 import { fetchActProfile, type ActProfile } from "@/lib/actProfile";
-import { Plan, PlanInput, type ActType, type CityPoolEntry, type CityScore, type Demographics, type Momentum, type Pick as PickT, type PlanEvent, type Stop, type ToolStatus } from "@/lib/types";
+import { Plan, PlanInput, type ActType, type ChangeSet, type CityPoolEntry, type CityScore, type Demographics, type Momentum, type Pick as PickT, type PlanEvent, type Stop, type ToolStatus, type TraceStep } from "@/lib/types";
 import { matchesCity } from "@/lib/routing";
+import { isReorderOnly, reorderStops } from "@/lib/revision";
 import { suggestCapacity } from "@/lib/economics";
 import { cityPoolFor, spreadPick } from "./pool";
 import { agentPrompt, AGENT_INSTRUCTIONS, withoutQlooPrompt } from "./prompts";
@@ -81,6 +82,17 @@ export interface RunOptions {
   id?: string;
   deps?: Partial<RunDeps>;
   signal?: AbortSignal;
+  /**
+   * The plan this run revises. The result gets a new id, `parentId`, `revision` and `revisionNote`; the parent is never
+   * written. A reorder-only change-set clones the parent (no Qloo, no model); anything else skips the agent loop and
+   * lets the orchestrator re-plan under the new constraints, reusing the parent's act, picks and city copy where they
+   * still apply (Qloo answers come from the response cache).
+   */
+  baseline?: Plan;
+  /** The change-set that produced `rawInput` from the baseline's input. Decides clone vs full revision. */
+  changes?: ChangeSet;
+  /** One line naming what changed, stored on the plan (see describeChanges/revisionNote). */
+  revisionNote?: string;
 }
 
 const envInt = (name: string, fallback: number) => {
@@ -377,48 +389,180 @@ function overallStatus(steps: { id: string; status: ToolStatus }[], actResolved:
   return data.every((s) => s.status === "ok") ? "ok" : "partial";
 }
 
+/** Lineage fields for a revision; empty for an original run so its plan shape is unchanged. */
+function lineage(baseline: Plan | undefined, note: string | undefined): Pick<Plan, "parentId" | "revision" | "revisionNote"> {
+  if (!baseline) return {};
+  return { parentId: baseline.id, revision: (baseline.revision ?? 1) + 1, ...(note ? { revisionNote: note } : {}) };
+}
+
+/** A new id for the run. A revision never reuses its parent's id. */
+function planId(opts: RunOptions): string {
+  return opts.id !== undefined && opts.id !== opts.baseline?.id ? opts.id : nanoid(10);
+}
+
+/**
+ * Reorder-only revision: the same cities in a hand-made order. Clones the parent with stops renumbered and travel
+ * days recomputed. No Qloo call, no model call; every Qloo figure on the plan is the parent's.
+ */
+async function cloneReordered(input: PlanInput, baseline: Plan, order: string[], emit: (e: PlanEvent) => void, opts: RunOptions): Promise<Plan> {
+  const now = opts.deps?.now ?? Date.now;
+  const save = opts.deps?.save ?? putPlan;
+  const startedAt = now();
+  const stops = reorderStops(structuredClone(baseline.stops), order);
+  const step: TraceStep = {
+    id: "revise",
+    name: "Revise",
+    status: "ok",
+    summary: "Reordered by hand; Qloo data carried over from the previous revision",
+    calls: [],
+    startedAt,
+    endedAt: now(),
+  };
+  const act = structuredClone(baseline.act);
+  const candidates = structuredClone(baseline.candidates);
+  const momentum = structuredClone(baseline.momentum);
+  emit({ type: "act", act });
+  emit({ type: "candidates", candidates });
+  emit({ type: "momentum", momentum });
+  emit({ type: "step", step });
+  for (const stop of stops) emit({ type: "stop", stop });
+  const plan = Plan.parse({
+    id: planId(opts),
+    createdAt: new Date(now()).toISOString(),
+    ...lineage(baseline, opts.revisionNote),
+    input,
+    act,
+    momentum,
+    candidates,
+    stops,
+    trace: [...structuredClone(baseline.trace), step],
+    summary: {
+      qlooCallTypes: baseline.summary.qlooCallTypes,
+      qlooCalls: baseline.summary.qlooCalls,
+      untappedStops: stops.filter((s) => s.city.quadrant === "untapped").length,
+      overallStatus: baseline.summary.overallStatus,
+    },
+    withoutQloo: baseline.withoutQloo ? structuredClone(baseline.withoutQloo) : undefined,
+  });
+  try {
+    await save(plan);
+  } catch (err) {
+    console.warn("[runPlan] save failed:", err instanceof Error ? err.message : err);
+  }
+  emit({ type: "done", plan });
+  return plan;
+}
+
+/**
+ * Full revision, in place of the agent loop: carry the parent's resolved act over (so the guard does not re-resolve
+ * it, possibly to a different candidate) and seed the parent's picks for every city still in the pool, so the guard
+ * only picks for cities that are new on the route.
+ */
+function seedFromBaseline(ctx: RunContext, baseline: Plan): string {
+  const { state, tracer } = ctx;
+  state.act = structuredClone(baseline.act);
+  state.actResolved = Boolean(baseline.act.id);
+  ctx.emit({ type: "act", act: { ...state.act, tasteTags: [...state.act.tasteTags] } });
+  tracer.begin("resolve", "Resolve act");
+  if (!state.actResolved) tracer.mark("resolve", "degraded");
+  tracer.end("resolve", `Carried over from the previous revision: "${state.act.name}"`);
+  let seeded = 0;
+  for (const s of baseline.stops) {
+    if (!ctx.pool.some((c) => c.id === s.city.id)) continue;
+    state.picks.set(s.city.id, {
+      openerIds: s.openers.map((p) => p.id),
+      sponsorIds: s.sponsors.map((p) => p.id),
+      placeIds: s.places.map((p) => p.id),
+      by: "model",
+    });
+    seeded++;
+  }
+  return `${seeded} stop${seeded === 1 ? "" : "s"}' picks carried over`;
+}
+
+/** The cities a full revision scores: the parent's candidates still in the pool, plus restored and locked cities. */
+function revisionField(ctx: RunContext, baseline: Plan): string[] {
+  const inPool = (id: string) => ctx.pool.some((c) => c.id === id);
+  const restored = ctx.pool.filter((c) => baseline.input.excludedCities.some((k) => matchesCity(c, k))).map((c) => c.id);
+  const locked = ctx.pool.filter((c) => ctx.input.lockedCities.some((k) => matchesCity(c, k))).map((c) => c.id);
+  const parentField = [...baseline.candidates.map((c) => c.id), ...baseline.stops.map((s) => s.city.id)];
+  return [...new Set([...parentField, ...restored, ...locked])].filter(inPool);
+}
+
+/**
+ * Picks for a revised stop whose city was on the parent route. The parent's picks are rebuilt from this run's data;
+ * a category where some picked id is no longer in the fetched lists (the parent's model may have used other venue
+ * tags or sponsor age buckets) keeps the parent's picks verbatim rather than shrinking.
+ */
+function revisedPicks(rebuilt: Pick<Stop, "openers" | "sponsors" | "places">, parent: Stop): Pick<Stop, "openers" | "sponsors" | "places"> {
+  const pickOf = (now: PickT[], before: PickT[]) => (now.length >= before.length ? now : structuredClone(before));
+  return {
+    openers: pickOf(rebuilt.openers, parent.openers),
+    sponsors: pickOf(rebuilt.sponsors, parent.sponsors),
+    places: pickOf(rebuilt.places, parent.places),
+  };
+}
+
 export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void, opts: RunOptions = {}): Promise<Plan> {
   const input = PlanInput.parse(rawInput);
+  const baseline = opts.baseline;
+  if (baseline && opts.changes && isReorderOnly(opts.changes, baseline)) {
+    return cloneReordered(input, baseline, opts.changes.order!, emit, opts);
+  }
   const deps = resolveDeps(input, opts.deps);
   const qloo = deps.qloo;
   const excluded = (c: CityPoolEntry) => input.excludedCities.some((k) => matchesCity(c, k));
   const tracer = new Tracer(emit, deps.now);
   const ctx: RunContext = { input, qloo, pool: deps.pool.filter((c) => !excluded(c)), tracer, state: newRunState(), emit, profile: deps.profile };
-
-  // 1. Agent loop.
-  const inflight = new Set<Promise<unknown>>();
-  const track = <T>(p: Promise<T>) => {
-    inflight.add(p);
-    p.finally(() => inflight.delete(p)).catch(() => {});
-    return p;
-  };
-  tracer.begin("agent", deps.model ? `Agent loop (${deps.model.id})` : "Agent loop");
   const meter = deps.model ? new UsageMeter(deps.model.id, promptCacheEnabled()) : undefined;
-  let agentSummary: string;
-  if (deps.model) {
-    const budget = AbortSignal.timeout(deps.agentBudgetMs);
-    const signal = opts.signal ? AbortSignal.any([budget, opts.signal]) : budget;
-    try {
-      const r = await deps.model.runAgent({
-        instructions: AGENT_INSTRUCTIONS,
-        prompt: agentPrompt(input, ctx.pool),
-        tools: createAgentTools(ctx, track),
-        maxSteps: deps.maxSteps,
-        signal,
-        meter,
-      });
-      agentSummary = `${r.toolCalls} tool calls over ${r.steps} steps${r.text ? `. ${r.text.trim().slice(0, 400)}` : ""}`;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      agentSummary = budget.aborted ? "Model hit the time budget; the orchestrator finished the plan" : `Model unavailable (${msg.slice(0, 160)}); the orchestrator finished the plan`;
+
+  if (baseline) {
+    // 1'. Revision: no agent loop. The constraints are already decided by the user; the orchestrator re-plans.
+    tracer.begin("agent", "Revise");
+    const carried = seedFromBaseline(ctx, baseline);
+    // Re-score the parent's candidate cities (plus any restored or locked city it never scored) rather than the whole
+    // pool: the same field keeps the route stable apart from the requested change, and every probe is a cache hit.
+    const field = revisionField(ctx, baseline);
+    if (field.length) await probeCities(ctx, field, "act");
+    tracer.end(
+      "agent",
+      `Revision of ${baseline.id}${opts.revisionNote ? `: ${opts.revisionNote}` : ""}. Constraints applied by the orchestrator; Qloo answers reused from cache; ${carried}; ${field.length} cities re-scored`,
+    );
+  } else {
+    // 1. Agent loop.
+    const inflight = new Set<Promise<unknown>>();
+    const track = <T>(p: Promise<T>) => {
+      inflight.add(p);
+      p.finally(() => inflight.delete(p)).catch(() => {});
+      return p;
+    };
+    tracer.begin("agent", deps.model ? `Agent loop (${deps.model.id})` : "Agent loop");
+    let agentSummary: string;
+    if (deps.model) {
+      const budget = AbortSignal.timeout(deps.agentBudgetMs);
+      const signal = opts.signal ? AbortSignal.any([budget, opts.signal]) : budget;
+      try {
+        const r = await deps.model.runAgent({
+          instructions: AGENT_INSTRUCTIONS,
+          prompt: agentPrompt(input, ctx.pool),
+          tools: createAgentTools(ctx, track),
+          maxSteps: deps.maxSteps,
+          signal,
+          meter,
+        });
+        agentSummary = `${r.toolCalls} tool calls over ${r.steps} steps${r.text ? `. ${r.text.trim().slice(0, 400)}` : ""}`;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        agentSummary = budget.aborted ? "Model hit the time budget; the orchestrator finished the plan" : `Model unavailable (${msg.slice(0, 160)}); the orchestrator finished the plan`;
+        tracer.mark("agent", "degraded");
+      }
+    } else {
+      agentSummary = "No model configured; the orchestrator ran the plan deterministically";
       tracer.mark("agent", "degraded");
     }
-  } else {
-    agentSummary = "No model configured; the orchestrator ran the plan deterministically";
-    tracer.mark("agent", "degraded");
+    await Promise.allSettled([...inflight]);
+    tracer.end("agent", agentSummary);
   }
-  await Promise.allSettled([...inflight]);
-  tracer.end("agent", agentSummary);
   opts.signal?.throwIfAborted();
 
   // 2. Coverage guard.
@@ -429,17 +573,22 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
     filled.push(detail);
     filledItems.add(item);
   });
-  if (filled.length) tracer.end("guard", `Model skipped ${[...filledItems].join(", ")}; orchestrator ${filled.join("; ")}`);
+  if (filled.length) {
+    tracer.end("guard", baseline ? `Revision: orchestrator ${filled.join("; ")}` : `Model skipped ${[...filledItems].join(", ")}; orchestrator ${filled.join("; ")}`);
+  }
 
   // Picture, description and links for the act (started when the act resolved; bounded by its own timeouts).
   await ctx.state.profilePromise;
 
-  // 3. Stops and copy.
+  // 3. Stops and copy. A revised stop with the same city, previous city and travel days keeps the parent's copy.
   const { state } = ctx;
   const order = state.route?.order ?? [];
   const legDays = state.route?.legDays ?? [];
+  const parentStops = [...(baseline?.stops ?? [])].sort((a, b) => a.order - b.order);
+  const parentBy = new Map(parentStops.map((s, i) => [s.city.id, { stop: s, prev: i ? parentStops[i - 1].city.id : null }]));
   tracer.begin("explain", "Explain picks");
   let modelCopies = 0;
+  let reusedCopies = 0;
   const stops: Stop[] = new Array(order.length);
   // Stops stream in tour order: each is emitted as soon as it and every earlier stop is ready.
   let flushed = 0;
@@ -448,34 +597,47 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
   };
   await mapLimit(order, 4, async (city, i) => {
     const demo = stopDemographics(ctx, city.id);
-    const facts = copyFacts(ctx, city, legDays[i] ?? 0, demo, i + 1);
-    let copy = templateCopy(facts);
-    if (deps.model) {
-      try {
-        const signal = opts.signal ? AbortSignal.any([AbortSignal.timeout(30_000), opts.signal]) : AbortSignal.timeout(30_000);
-        const c = await deps.model.writeStopCopy(facts, signal, meter);
-        if (copyUsesOnlyGivenNumbers(c, facts)) {
-          copy = c;
-          modelCopies++;
+    const days = legDays[i] ?? 0;
+    const parent = parentBy.get(city.id);
+    const sameLeg = parent && parent.prev === (i ? order[i - 1].id : null) && parent.stop.legDays === days;
+    let copy: StopCopy;
+    if (sameLeg) {
+      copy = { suggestion: parent.stop.suggestion, whyHere: parent.stop.whyHere };
+      reusedCopies++;
+    } else {
+      const facts = copyFacts(ctx, city, days, demo, i + 1);
+      copy = templateCopy(facts);
+      if (deps.model) {
+        try {
+          const signal = opts.signal ? AbortSignal.any([AbortSignal.timeout(30_000), opts.signal]) : AbortSignal.timeout(30_000);
+          const c = await deps.model.writeStopCopy(facts, signal, meter);
+          if (copyUsesOnlyGivenNumbers(c, facts)) {
+            copy = c;
+            modelCopies++;
+          }
+        } catch {
+          // keep the template
         }
-      } catch {
-        // keep the template
       }
     }
-    const stop: Stop = { order: i + 1, city, legDays: legDays[i] ?? 0, demographics: demo, ...buildPicks(ctx, city), ...copy };
+    const rebuilt = buildPicks(ctx, city);
+    const picks = parent ? revisedPicks(rebuilt, parent.stop) : rebuilt;
+    const stop: Stop = { order: i + 1, city, legDays: days, demographics: demo, ...picks, ...copy };
     stops[i] = stop;
     flush();
   });
   const picksCount = stops.reduce((n, s) => n + s.openers.length + s.sponsors.length + s.places.length, 0);
   const explained = stops.reduce((n, s) => n + [...s.openers, ...s.sponsors, ...s.places].length, 0);
-  tracer.end(
-    "explain",
-    `explanations on ${explained} of ${picksCount} picks; city copy by ${deps.model ? `model for ${modelCopies}/${stops.length} stops` : "template"}`,
-  );
+  const copySummary = baseline
+    ? `city copy: ${reusedCopies} reused from the previous revision, ${modelCopies} by model, ${stops.length - reusedCopies - modelCopies} by template`
+    : `city copy by ${deps.model ? `model for ${modelCopies}/${stops.length} stops` : "template"}`;
+  tracer.end("explain", `explanations on ${explained} of ${picksCount} picks; ${copySummary}`);
 
-  // 4. Optional plain-LLM comparison.
+  // 4. Optional plain-LLM comparison. A revision carries the parent's over (no extra model call).
   let withoutQloo: Plan["withoutQloo"];
-  if (deps.withoutQloo && deps.model) {
+  if (baseline) {
+    withoutQloo = baseline.withoutQloo ? structuredClone(baseline.withoutQloo) : undefined;
+  } else if (deps.withoutQloo && deps.model) {
     try {
       withoutQloo = await deps.model.planWithoutQloo(withoutQlooPrompt(input, ctx.pool), opts.signal, meter);
     } catch {
@@ -488,8 +650,9 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
   const momentum: Momentum = state.momentum ?? { trend: "unknown", status: "empty" };
   const trace = tracer.steps.map((s) => ({ ...s, calls: [...s.calls] }));
   const plan = Plan.parse({
-    id: opts.id ?? nanoid(10),
+    id: planId(opts),
     createdAt: new Date(deps.now()).toISOString(),
+    ...lineage(baseline, opts.revisionNote),
     input,
     act,
     momentum,

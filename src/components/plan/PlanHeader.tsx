@@ -5,6 +5,7 @@ import type { Plan } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { QlooTag } from "@/components/ui/QlooTag";
 import { StatusChip } from "@/components/ui/StatusChip";
+import Link from "next/link";
 import { Check, Download, FileText, Link2, Play, Shuffle } from "@/components/ui/icons";
 import { ACT_TYPE_LABEL, planParams } from "./format";
 import { ActLinks, ActPortrait } from "./ActIdentity";
@@ -62,6 +63,17 @@ export function PlanHeader({ plan, comparing, onToggleCompare }: { plan: Plan; c
         <ActPortrait act={act} size={96} className="mt-7 hidden sm:block" />
         <div className="flex min-w-0 flex-col gap-3">
           <p className="label">Tour plan</p>
+          {plan.revision !== undefined && plan.revision > 1 && (
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[15px] leading-[22px]">
+              <span className="inline-flex h-[22px] items-center rounded-full bg-spot-soft px-2.5 font-mono text-xs font-medium leading-4 text-spot">Revision {plan.revision}</span>
+              {plan.parentId && (
+                <Link href={`/plan/${plan.parentId}`} className="rounded-sm text-[13px] leading-[18px] text-signal underline underline-offset-2">
+                  from revision {plan.revision - 1}
+                </Link>
+              )}
+              {plan.revisionNote && <span className="text-[13px] leading-[18px] text-ink-muted">{plan.revisionNote}</span>}
+            </div>
+          )}
           <div className="flex items-start gap-4">
             <ActPortrait act={act} size={64} className="sm:hidden" />
             <h1 className="font-display text-[44px] font-bold uppercase leading-[44px] tracking-[0.01em] sm:text-[64px] sm:leading-[60px]">{act.name}</h1>

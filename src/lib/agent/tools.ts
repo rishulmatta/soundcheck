@@ -546,7 +546,7 @@ export function route(ctx: RunContext, stops?: number, alsoLock: string[] = []) 
   for (const key of locked) {
     if (!ctx.state.candidates!.some((c) => matchesCity(c, key))) notes.push(`${key} is not in the scored pool`);
   }
-  const r = routeTour(ctx.state.candidates!, { stops: stops ?? ctx.input.stops, locked, excluded: ctx.input.excludedCities });
+  const r = routeTour(ctx.state.candidates!, { stops: stops ?? ctx.input.stops, locked, excluded: ctx.input.excludedCities, order: ctx.input.order });
   ctx.state.route = r;
   ctx.state.routeNotes = notes;
   const days = r.legDays.reduce((a, b) => a + b, 0);

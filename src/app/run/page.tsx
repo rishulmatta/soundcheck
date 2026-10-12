@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useReducer, useState } from "react";
 import sample from "@/fixtures/plan.sample.json";
 import type { Act, CityScore, Momentum, Plan, PlanEvent, PlanInput, Stop, TraceStep } from "@/lib/types";
-import { PlanInput as PlanInputSchema } from "@/lib/types";
+import { RunRequest, isRevisionRequest } from "@/lib/types";
+import { applyChanges } from "@/lib/revision";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { StatusChip } from "@/components/ui/StatusChip";
@@ -91,6 +93,8 @@ export default function RunPage() {
   const [state, dispatch] = useReducer(reduce, initial);
   const [attempt, setAttempt] = useState(0);
   const [input, setInput] = useState<PlanInput | undefined>();
+  /** Set when this run revises an earlier plan: the parent's id, for the subtitle and the link back. */
+  const [parentId, setParentId] = useState<string | undefined>();
   const [demo, setDemo] = useState(false);
   const sel = useStopSelection();
 
@@ -124,10 +128,10 @@ export default function RunPage() {
         }
         return;
       }
-      let parsed: PlanInput | undefined;
+      let parsed: RunRequest | undefined;
       try {
         const raw = sessionStorage.getItem(RUN_INPUT_KEY);
-        parsed = raw ? PlanInputSchema.parse(JSON.parse(raw)) : undefined;
+        parsed = raw ? RunRequest.parse(JSON.parse(raw)) : undefined;
       } catch {
         parsed = undefined;
       }
@@ -135,7 +139,20 @@ export default function RunPage() {
         emit({ type: "error", message: "There is no run to start. Choose an act on the home page." });
         return;
       }
-      setInput(parsed);
+      if (isRevisionRequest(parsed)) {
+        const { parentId: pid, changes } = parsed;
+        setParentId(pid);
+        // The parent's input is not part of the request. Best effort: read the parent so the header, map and
+        // economics have the revised input while the run streams. The run still works if this fails.
+        fetch(`/api/plan/${encodeURIComponent(pid)}`, { signal: ctrl.signal })
+          .then((r) => (r.ok ? (r.json() as Promise<Plan>) : undefined))
+          .then((parent) => {
+            if (parent && !ctrl.signal.aborted) setInput(applyChanges(parent.input, changes, parent.candidates));
+          })
+          .catch(() => {});
+      } else {
+        setInput(parsed);
+      }
       try {
         const res = await fetch("/api/plan", {
           method: "POST",
@@ -188,16 +205,23 @@ export default function RunPage() {
   const wanted = input?.stops ?? 10;
   const doneSteps = steps.filter((s) => s.endedAt !== undefined).length;
   const title = act?.name ?? input?.actQuery;
+  const revising = parentId !== undefined;
 
   return (
     <div className="mx-auto w-full max-w-[1280px] px-4 pb-16 lg:px-12">
       <SiteBar right={demo ? <span className="label">Demo replay</span> : undefined} />
       <div className="mb-6 flex flex-col gap-2 pt-2">
-        <p className="label">{state.phase === "error" ? "Soundcheck stopped" : state.phase === "done" ? "Plan ready" : "Soundcheck running"}</p>
+        <p className="label">{state.phase === "error" ? "Soundcheck stopped" : state.phase === "done" ? (revising ? "Revision ready" : "Plan ready") : revising ? "Revising plan" : "Soundcheck running"}</p>
         {title ? (
           <h1 className="font-display text-[40px] font-bold uppercase leading-10 tracking-[0.01em] sm:text-[56px] sm:leading-[56px]">{title}</h1>
         ) : state.phase === "error" ? null : (
           <Skeleton className="h-10 w-72 sm:h-14" />
+        )}
+        {revising && (
+          <p className="text-[15px] leading-[22px] text-ink-muted">
+            Revision of <span className="num">{parentId}</span>.{" "}
+            <Link href={`/plan/${parentId}`} className="rounded-sm text-signal underline underline-offset-2">Back to that plan</Link>
+          </p>
         )}
         {input && (
           <p className="text-[15px] leading-[22px] text-ink-muted">
@@ -211,13 +235,13 @@ export default function RunPage() {
           <StatusChip status="error" className="self-start">run failed</StatusChip>
           <p className="text-[15px] leading-[22px]">{state.error}</p>
           <div className="flex flex-wrap gap-2">
-            {input && <Button variant="primary" onClick={retry}>Retry</Button>}
+            {(input || revising) && <Button variant="primary" onClick={retry}>Retry</Button>}
             <Button variant="secondary" href="/" icon={<ArrowLeft />}>Back to start</Button>
           </div>
         </div>
       )}
 
-      {!(state.phase === "error" && !input) && (
+      {!(state.phase === "error" && !input && !revising) && (
       <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
         <div className="lg:sticky lg:top-4 lg:self-start">
           <TraceRail steps={steps} live={state.phase === "running"} variant="rail" />

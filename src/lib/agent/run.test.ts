@@ -5,6 +5,9 @@ import type { AgentModel } from "./model";
 import type { AgentToolSpec } from "./tools";
 import { copyUsesOnlyGivenNumbers, leadAngle, numbersIn, runPlan, type RunDeps } from "./run";
 import { cityPoolFor } from "./pool";
+import { applyChanges, describeChanges, revisionNote } from "@/lib/revision";
+import { legDaysAlong } from "@/lib/routing";
+import type { ChangeSet } from "@/lib/types";
 
 /* ---------------------------------------------------------------- stubs */
 
@@ -122,6 +125,7 @@ function stubModel(overrides: Partial<AgentModel> = {}): AgentModel {
       };
     },
     planWithoutQloo: async () => ({ cities: ["New York", "Chicago"], openers: ["Some Band"], note: "Big cities." }),
+    proposeRevision: async () => ({ lock: [], unlock: [], drop: [], restore: [], note: "" }),
     ...overrides,
   };
 }
@@ -296,6 +300,164 @@ describe("runPlan with a model", () => {
     expect(plan.stops.some((s) => s.whyHere.includes("97%"))).toBe(false);
     expect(plan.stops.some((s) => s.whyHere.endsWith("is primed."))).toBe(true);
     expect(plan.withoutQloo?.cities).toEqual(["New York", "Chicago"]);
+  });
+});
+
+describe("runPlan revisions", () => {
+  const pool = cityPoolFor("north-america");
+  const changes = (c: Partial<ChangeSet>): ChangeSet => ({ lock: [], unlock: [], drop: [], restore: [], ...c });
+
+  async function firstRun() {
+    const { plan } = await run(baseInput, { qloo: stubQloo(), model: stubModel() });
+    return plan;
+  }
+
+  async function revise(parent: Plan, c: ChangeSet, deps: Partial<RunDeps>) {
+    const events: PlanEvent[] = [];
+    const save = vi.fn(async () => {});
+    const input = applyChanges(parent.input, c, pool);
+    const note = revisionNote(describeChanges(c, parent, pool));
+    const plan = await runPlan(input, (e) => events.push(e), {
+      baseline: parent,
+      changes: c,
+      revisionNote: note,
+      deps: { save, now: () => 1_760_000_100_000, ...deps },
+    });
+    return { plan, events, save, note };
+  }
+
+  it("re-plans a full revision without the agent loop and reuses the parent's copy where the leg is unchanged", async () => {
+    const parent = await firstRun();
+    const ids = parent.stops.map((s) => s.city.id);
+    // Lock the opening city (so the route keeps its start) and drop the last stop: the early legs stay the same.
+    const dropped = ids[ids.length - 1];
+    const locked = ids[0];
+    const runAgent = vi.fn(async () => ({ steps: 0, toolCalls: 0, text: "" }));
+    const writeStopCopy = vi.fn(async () => ({ suggestion: "A room that fits", whyHere: "REWRITTEN" }));
+    const c = changes({ drop: [dropped], lock: [locked] });
+    const { plan, save, note } = await revise(parent, c, { qloo: stubQloo(), model: stubModel({ runAgent, writeStopCopy }) });
+
+    expect(Plan.safeParse(plan).success).toBe(true);
+    expect(plan.id).not.toBe(parent.id);
+    expect(plan.parentId).toBe(parent.id);
+    expect(plan.revision).toBe(2);
+    expect(plan.revisionNote).toBe(note);
+    expect(note).toMatch(/^Drop .+ · Lock .+$/);
+    expect(runAgent).not.toHaveBeenCalled();
+    expect(save).toHaveBeenCalledWith(plan);
+
+    const newIds = plan.stops.map((s) => s.city.id);
+    expect(newIds).not.toContain(dropped);
+    expect(newIds).toContain(locked);
+    expect(newIds[0]).toBe(locked); // the first locked city starts the route
+    expect(newIds).toHaveLength(parent.stops.length); // the freed slot is filled by the next best city
+    expect(plan.input.excludedCities).toContain(dropped);
+    expect(plan.input.lockedCities).toContain(locked);
+
+    const parentBy = new Map(parent.stops.map((s, i) => [s.city.id, { stop: s, prev: i ? parent.stops[i - 1].city.id : null }]));
+    let reused = 0;
+    plan.stops.forEach((s, i) => {
+      const p = parentBy.get(s.city.id);
+      const same = p && p.prev === (i ? plan.stops[i - 1].city.id : null) && p.stop.legDays === s.legDays;
+      if (same) {
+        reused++;
+        expect(s.whyHere).toBe(p.stop.whyHere);
+        expect(s.suggestion).toBe(p.stop.suggestion);
+      } else {
+        expect(s.whyHere).toBe("REWRITTEN");
+      }
+      // Picks carried over for cities that stayed on the route.
+      if (p) expect(s.openers.map((o) => o.id)).toEqual(p.stop.openers.map((o) => o.id));
+    });
+    expect(reused).toBeGreaterThan(0);
+    expect(reused).toBeLessThan(plan.stops.length);
+    expect(writeStopCopy).toHaveBeenCalledTimes(plan.stops.length - reused);
+    const explain = plan.trace.find((s) => s.id === "explain");
+    expect(explain?.summary).toContain(`city copy: ${reused} reused from the previous revision, ${plan.stops.length - reused} by model, 0 by template`);
+
+    const agent = plan.trace.find((s) => s.id === "agent");
+    expect(agent?.status).toBe("ok");
+    expect(agent?.summary).toMatch(new RegExp(`^Revision of ${parent.id}: `));
+    expect(plan.act.id).toBe(parent.act.id);
+    expect(plan.summary.model?.id).toBe("stub-model");
+  });
+
+  it("re-scores the parent's candidate field, not the whole pool, so only the requested change moves the route", async () => {
+    const field = ["seattle", "portland", "boise", "salt-lake-city", "denver", "omaha", "kansas-city", "minneapolis", "chicago", "detroit", "nashville", "atlanta", "tulsa", "austin"];
+    const model = stubModel({
+      async runAgent({ tools }) {
+        await call(tools, "probeCities", { cityIds: field });
+        return { steps: 1, toolCalls: 1, text: "" };
+      },
+    });
+    const { plan: parent } = await run(baseInput, { qloo: stubQloo(), model });
+    expect(parent.candidates.map((c) => c.id).sort()).toEqual([...field].sort());
+
+    const ids = parent.stops.map((s) => s.city.id);
+    const restoredParent = { ...parent, input: { ...parent.input, excludedCities: ["Halifax"] } };
+    const qloo = stubQloo();
+    const c = changes({ drop: [ids[2]], restore: ["halifax"] });
+    const { plan } = await revise(restoredParent, c, { qloo, model: stubModel() });
+    const expected = [...field.filter((id) => id !== ids[2]), "halifax"].sort();
+    expect(plan.candidates.map((x) => x.id).sort()).toEqual(expected);
+    expect(qloo.calls.heatmapForCity).toBe(expected.length);
+    // Every surviving stop of the parent is still routed; one new city fills the dropped slot.
+    const kept = ids.filter((id) => id !== ids[2]);
+    expect(plan.stops.map((s) => s.city.id)).toEqual(expect.arrayContaining(kept));
+    expect(plan.stops).toHaveLength(ids.length);
+  });
+
+  it("honours the parent's manual order on a later revision that keeps the same cities", async () => {
+    const parent = await firstRun();
+    const reversed = parent.stops.map((s) => s.city.id).reverse();
+    const { plan } = await revise(parent, changes({ order: reversed, window: "Mar–Apr 2027" }), { qloo: stubQloo(), model: null });
+    expect(plan.stops.map((s) => s.city.id)).toEqual(reversed);
+    expect(plan.input.window).toBe("Mar–Apr 2027");
+    expect(plan.trace.find((s) => s.id === "explain")?.summary).toMatch(/0 by model, \d+ by template/);
+  });
+
+  it("clones a reorder-only revision without touching Qloo or the model", async () => {
+    const parent = await firstRun();
+    const qloo = stubQloo();
+    const runAgent = vi.fn(async () => ({ steps: 0, toolCalls: 0, text: "" }));
+    const writeStopCopy = vi.fn(async () => ({ suggestion: "x", whyHere: "y" }));
+    const ids = parent.stops.map((s) => s.city.id);
+    const order = [ids[1], ids[0], ...ids.slice(2)];
+    const t0 = performance.now();
+    const { plan, events } = await revise(parent, changes({ order }), { qloo, model: stubModel({ runAgent, writeStopCopy }) });
+    expect(performance.now() - t0).toBeLessThan(500);
+
+    expect(qloo.calls).toEqual({});
+    expect(runAgent).not.toHaveBeenCalled();
+    expect(writeStopCopy).not.toHaveBeenCalled();
+    expect(plan.revision).toBe(2);
+    expect(plan.parentId).toBe(parent.id);
+    expect(plan.id).not.toBe(parent.id);
+    expect(plan.input.order).toEqual(order);
+    expect(plan.stops.map((s) => s.city.id)).toEqual(order);
+    expect(plan.stops.map((s) => s.order)).toEqual(order.map((_, i) => i + 1));
+    expect(plan.stops.map((s) => s.legDays)).toEqual(legDaysAlong(plan.stops.map((s) => s.city)));
+    expect(plan.stops[0].whyHere).toBe(parent.stops[1].whyHere);
+
+    const revise_ = plan.trace.at(-1);
+    expect(revise_).toMatchObject({ id: "revise", name: "Revise", status: "ok", calls: [] });
+    expect(revise_?.summary).toMatch(/Reordered by hand/);
+    expect(plan.trace).toHaveLength(parent.trace.length + 1);
+    expect(plan.summary.qlooCalls).toBe(parent.summary.qlooCalls);
+    expect(plan.candidates).toEqual(parent.candidates);
+
+    expect(events.map((e) => e.type)).toEqual(["act", "candidates", "momentum", "step", ...order.map(() => "stop"), "done"]);
+    // The parent is untouched.
+    expect(parent.stops.map((s) => s.city.id)).toEqual(ids);
+    expect(parent.trace.some((s) => s.id === "revise")).toBe(false);
+  });
+
+  it("numbers a revision of a revision from its parent", async () => {
+    const parent = { ...(await firstRun()), id: "rev-2", revision: 2, parentId: "test-plan" };
+    const ids = parent.stops.map((s) => s.city.id);
+    const { plan } = await revise(parent, changes({ order: [...ids].reverse() }), {});
+    expect(plan.revision).toBe(3);
+    expect(plan.parentId).toBe("rev-2");
   });
 });
 

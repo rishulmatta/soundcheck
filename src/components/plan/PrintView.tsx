@@ -48,6 +48,11 @@ export function PrintView({ plan }: { plan: Plan }) {
           {act.description && <p className="mt-2 max-w-[70ch] text-[15px] leading-[22px]">{act.description}</p>}
           <ActLinks act={act} print className="mt-2" />
           <p className="mt-2 text-[15px] leading-[22px] text-ink-muted">{planParams(plan).join(" · ")}</p>
+          {plan.revision !== undefined && plan.revision > 1 && (
+            <p className="mt-1 text-[13px] leading-[18px] text-ink-muted">
+              Revision {plan.revision}{plan.revisionNote ? `: ${plan.revisionNote}` : ""}
+            </p>
+          )}
           <p className="mt-1 flex flex-wrap items-center gap-x-3 text-[15px] leading-[22px]">
             <span className="label">Momentum</span>
             <QlooTag />

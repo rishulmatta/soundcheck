@@ -3,6 +3,8 @@
 import type { Pick, Stop } from "@/lib/types";
 import { AudienceBars } from "@/components/ui/AudienceBars";
 import { LimitedData } from "@/components/ui/LimitedData";
+import { Button } from "@/components/ui/Button";
+import { Lock, Trash, Undo, Unlock } from "@/components/ui/icons";
 import { MarketBadge } from "@/components/ui/MarketBadge";
 import { QlooTag } from "@/components/ui/QlooTag";
 import { StopMarker } from "@/components/ui/StopMarker";
@@ -27,6 +29,11 @@ interface Props {
   print?: boolean;
   /** Travel-and-crew break-even for this stop, from the route economics state. Omitted: no line. */
   breakEven?: { b: BreakEven; units: Units; rates: Rates };
+  /** Pending revision state for this city: locked (already or about to be) and dropped (about to be). */
+  pending?: { locked: boolean; dropped: boolean };
+  /** Toggle the lock on this city's draft. Providing either callback shows the action buttons. */
+  onLock?: (cityId: string) => void;
+  onDrop?: (cityId: string) => void;
   className?: string;
 }
 
@@ -61,11 +68,13 @@ function PickRows({ picks, kind, showOverlap, print }: { picks: Pick[]; kind: st
 }
 
 /** One card per stop. Affinity counts up when the card scrolls into view; audience bars fill after it. */
-export function CityCard({ stop, poolSize, selected = false, hovered = false, onSelect, onHover, animate = true, print = false, breakEven, className }: Props) {
+export function CityCard({ stop, poolSize, selected = false, hovered = false, onSelect, onHover, animate = true, print = false, breakEven, pending, onLock, onDrop, className }: Props) {
   const { city, demographics, openers, sponsors, places } = stop;
   const [ref, inView] = useInView<HTMLElement>(animate);
   const play = inView;
   const interactive = !print;
+  const locked = pending?.locked ?? false;
+  const dropped = pending?.dropped ?? false;
   return (
     <article
       ref={ref}
@@ -78,10 +87,11 @@ export function CityCard({ stop, poolSize, selected = false, hovered = false, on
         "sc-link scroll-mt-6 rounded-md border bg-bg-raised p-5 sm:p-6",
         selected ? "border-spot bg-spot-soft" : hovered ? "border-line-strong" : "border-line",
         interactive && "cursor-pointer",
+        dropped && "opacity-55",
         className,
       )}
     >
-      <header className="mb-4 flex items-center justify-between gap-3">
+      <header className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <div className="flex min-w-0 items-center gap-3">
           <StopMarker n={stop.order} size={26} />
           <h3 id={`stop-${stop.order}-title`} className="font-display text-[40px] font-bold uppercase leading-10 tracking-[0.01em]">
@@ -94,7 +104,28 @@ export function CityCard({ stop, poolSize, selected = false, hovered = false, on
             )}
           </h3>
         </div>
-        <MarketBadge quadrant={city.quadrant} />
+        <div className="flex flex-none flex-wrap items-center justify-end gap-2">
+          {interactive && dropped && <span className="inline-flex h-[22px] items-center rounded-full bg-warn-soft px-2.5 font-mono text-xs font-medium leading-4 text-warn">Dropping</span>}
+          {interactive && locked && !dropped && (
+            <span className="inline-flex h-[22px] items-center gap-1 rounded-full bg-spot-soft px-2.5 font-mono text-xs font-medium leading-4 text-spot">
+              <Lock size={12} />
+              Locked
+            </span>
+          )}
+          <MarketBadge quadrant={city.quadrant} />
+          {interactive && onLock && (
+            <Button variant="ghost" size="sm" aria-pressed={locked} icon={locked ? <Unlock /> : <Lock />} onClick={(e) => { e.stopPropagation(); onLock(city.id); }}>
+              {locked ? "Unlock" : "Lock"}
+              <span className="sr-only"> {city.name}</span>
+            </Button>
+          )}
+          {interactive && onDrop && (
+            <Button variant="ghost" size="sm" icon={dropped ? <Undo /> : <Trash />} onClick={(e) => { e.stopPropagation(); onDrop(city.id); }}>
+              {dropped ? "Keep" : "Drop"}
+              <span className="sr-only"> {city.name}</span>
+            </Button>
+          )}
+        </div>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1fr_1.15fr]">
