@@ -19,7 +19,7 @@ import { matchesCity } from "@/lib/routing";
 import { suggestCapacity } from "@/lib/economics";
 import { cityPoolFor, spreadPick } from "./pool";
 import { agentPrompt, AGENT_INSTRUCTIONS, withoutQlooPrompt } from "./prompts";
-import { createAnthropicModel, type AgentModel, type StopCopy } from "./model";
+import { createAnthropicModel, promptCacheEnabled, UsageMeter, type AgentModel, type StopCopy } from "./model";
 import {
   compareOpeners,
   createAgentTools,
@@ -393,6 +393,7 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
     return p;
   };
   tracer.begin("agent", deps.model ? `Agent loop (${deps.model.id})` : "Agent loop");
+  const meter = deps.model ? new UsageMeter(deps.model.id, promptCacheEnabled()) : undefined;
   let agentSummary: string;
   if (deps.model) {
     const budget = AbortSignal.timeout(deps.agentBudgetMs);
@@ -404,6 +405,7 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
         tools: createAgentTools(ctx, track),
         maxSteps: deps.maxSteps,
         signal,
+        meter,
       });
       agentSummary = `${r.toolCalls} tool calls over ${r.steps} steps${r.text ? `. ${r.text.trim().slice(0, 400)}` : ""}`;
     } catch (err) {
@@ -451,7 +453,7 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
     if (deps.model) {
       try {
         const signal = opts.signal ? AbortSignal.any([AbortSignal.timeout(30_000), opts.signal]) : AbortSignal.timeout(30_000);
-        const c = await deps.model.writeStopCopy(facts, signal);
+        const c = await deps.model.writeStopCopy(facts, signal, meter);
         if (copyUsesOnlyGivenNumbers(c, facts)) {
           copy = c;
           modelCopies++;
@@ -475,7 +477,7 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
   let withoutQloo: Plan["withoutQloo"];
   if (deps.withoutQloo && deps.model) {
     try {
-      withoutQloo = await deps.model.planWithoutQloo(withoutQlooPrompt(input, ctx.pool), opts.signal);
+      withoutQloo = await deps.model.planWithoutQloo(withoutQlooPrompt(input, ctx.pool), opts.signal, meter);
     } catch {
       withoutQloo = undefined;
     }
@@ -498,6 +500,7 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
       qlooCallTypes: tracer.callTypes.size,
       qlooCalls: tracer.calls,
       untappedStops: stops.filter((s) => s.city.quadrant === "untapped").length,
+      model: meter?.usage,
       overallStatus: overallStatus(trace, state.actResolved),
     },
     withoutQloo,

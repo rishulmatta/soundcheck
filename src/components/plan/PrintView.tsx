@@ -105,7 +105,12 @@ export function PrintView({ plan }: { plan: Plan }) {
 
         <section className={sheet} aria-label="Method">
           <h2 className="font-display text-[26px] font-semibold leading-7">How this plan was made</h2>
-          <p className="mt-1 text-[13px] leading-[18px] text-ink-muted">Generated {formatDate(plan.createdAt)}. Every request below is shown with the key and entity IDs redacted.</p>
+          <p className="mt-1 text-[13px] leading-[18px] text-ink-muted">
+            Generated {formatDate(plan.createdAt)}. Every request below is shown with the key and entity IDs redacted.
+            {plan.summary.model && plan.summary.model.calls > 0 && (
+              <> Model {plan.summary.model.id}: <span className="num">{plan.summary.model.calls}</span> calls, <span className="num">{plan.summary.model.inputTokens.toLocaleString("en-US")}</span> input tokens (<span className="num">{plan.summary.model.cacheReadTokens.toLocaleString("en-US")}</span> from cache), <span className="num">{plan.summary.model.outputTokens.toLocaleString("en-US")}</span> output tokens.</>
+            )}
+          </p>
           <ol className="mt-4">
             {plan.trace.map((t) => (
               <li key={t.id} className="border-t border-line py-2">

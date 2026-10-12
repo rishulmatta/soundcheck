@@ -138,6 +138,19 @@ export const Momentum = z.object({
 });
 export type Momentum = z.infer<typeof Momentum>;
 
+/** Token usage across every model call in a run. Cached tokens are billed at a fraction of the uncached rate. */
+export const ModelUsage = z.object({
+  id: z.string(),
+  calls: z.number().int(),
+  steps: z.number().int(),
+  inputTokens: z.number().int(),
+  cacheReadTokens: z.number().int(),
+  cacheWriteTokens: z.number().int(),
+  outputTokens: z.number().int(),
+  promptCache: z.boolean(),
+});
+export type ModelUsage = z.infer<typeof ModelUsage>;
+
 export const TraceCall = z.object({
   request: z.string(),
   status: ToolStatus,
@@ -170,6 +183,8 @@ export const Plan = z.object({
     qlooCalls: z.number().int(),
     untappedStops: z.number().int(),
     overallStatus: ToolStatus,
+    /** Model token usage for the whole run, when a model ran. */
+    model: ModelUsage.optional(),
   }),
   /** Optional plain-LLM plan for the "Without Qloo" toggle. */
   withoutQloo: z.object({ cities: z.array(z.string()), openers: z.array(z.string()), note: z.string() }).optional(),

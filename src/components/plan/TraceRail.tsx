@@ -139,6 +139,8 @@ export function TraceRail({ steps, variant = "rail", live = false, summary, clas
 
   const types = summary?.qlooCallTypes;
   const calls = summary?.qlooCalls;
+  const m = summary?.model;
+  const cachedShare = m && m.inputTokens > 0 ? Math.round((m.cacheReadTokens / m.inputTokens) * 100) : 0;
   return (
     <section aria-label="Agent trace" className={cn("overflow-hidden rounded-md border border-line bg-bg-raised", className)}>
       <button
@@ -157,6 +159,11 @@ export function TraceRail({ steps, variant = "rail", live = false, summary, clas
           </span>
         )}
         {summary && <StatusChip status={summary.overallStatus} size="sm" />}
+        {m && m.calls > 0 && (
+          <span className="text-[13px] leading-[18px] text-ink-muted" title={`${m.id}: ${m.calls} calls, ${m.steps} steps, ${m.inputTokens.toLocaleString("en-US")} input tokens of which ${m.cacheReadTokens.toLocaleString("en-US")} read from cache and ${m.cacheWriteTokens.toLocaleString("en-US")} written to it, ${m.outputTokens.toLocaleString("en-US")} output tokens`}>
+            <span className="num">{m.calls}</span> model calls · <span className="num">{Math.round(m.inputTokens / 1000)}k</span> tokens in, <span className="num">{cachedShare}%</span> cached
+          </span>
+        )}
         <span className="ml-auto text-[13px] leading-[18px] text-ink-muted">{expanded ? "Hide calls" : "Show redacted calls"}</span>
       </button>
       {expanded && <div className="sc-fade border-t border-line">{list}</div>}
