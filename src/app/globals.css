@@ -12,7 +12,7 @@
   --warn: #f0907a; --warn-soft: #3d1f18;
   --danger: #ff6b5b; --danger-soft: #3f1915;
   --focus: #7cc9ea;
-  --map-water: #0c0b0a; --map-land: #161412; --map-label: #6b645b;
+  --map-water: #0a0b0d; --map-land: #211e1a; --map-label: #a39b8f; --map-coast: #3d3832; --map-border: #6b635a; --map-border-soft: #4a443e;
   --route: var(--spot);
   --quadrant-untapped: var(--signal); --quadrant-established: var(--ink-muted); --quadrant-reach: var(--ink-faint);
   --shadow-popover: 0 8px 24px #00000080; --shadow-glow: 0 0 24px #7cc9ea66;
@@ -29,7 +29,7 @@
   --spot: #b4620a; --spot-soft: #fbe9cf; --on-spot: #ffffff;
   --signal: #0f6f94; --signal-soft: #d9eef7; --signal-glow: #0f6f9433;
   --ok: #1f7a4d; --ok-soft: #dcf3e6; --warn: #a8432b; --warn-soft: #fbe3dc; --danger: #b3261e; --danger-soft: #fbdcd8;
-  --focus: #0f6f94; --map-water: #e3ded5; --map-land: #f1ede6; --map-label: #8c8478;
+  --focus: #0f6f94; --map-water: #dcd6cc; --map-land: #f1ede6; --map-label: #6f6760; --map-coast: #c4bcb0; --map-border: #9a9186; --map-border-soft: #b8b0a5;
   --shadow-popover: 0 8px 24px #1a171526; --shadow-glow: 0 0 16px #0f6f9433;
 }
 

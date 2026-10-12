@@ -11,6 +11,9 @@ export interface MapTokens {
   water: string;
   land: string;
   label: string;
+  coast: string;
+  border: string;
+  borderSoft: string;
   line: string;
   lineStrong: string;
   spot: string;
@@ -21,9 +24,12 @@ export interface MapTokens {
 }
 
 const FALLBACK_TOKENS: MapTokens = {
-  water: "#0c0b0a",
-  land: "#161412",
-  label: "#6b645b",
+  water: "#0a0b0d",
+  land: "#211e1a",
+  label: "#a39b8f",
+  coast: "#3d3832",
+  border: "#6b635a",
+  borderSoft: "#4a443e",
   line: "#2b2825",
   lineStrong: "#403b36",
   spot: "#f2a93b",
@@ -42,6 +48,9 @@ export function readMapTokens(): MapTokens {
     water: read("--map-water", FALLBACK_TOKENS.water),
     land: read("--map-land", FALLBACK_TOKENS.land),
     label: read("--map-label", FALLBACK_TOKENS.label),
+    coast: read("--map-coast", FALLBACK_TOKENS.coast),
+    border: read("--map-border", FALLBACK_TOKENS.border),
+    borderSoft: read("--map-border-soft", FALLBACK_TOKENS.borderSoft),
     line: read("--line", FALLBACK_TOKENS.line),
     lineStrong: read("--line-strong", FALLBACK_TOKENS.lineStrong),
     spot: read("--spot", FALLBACK_TOKENS.spot),
@@ -89,10 +98,15 @@ export function recolorStyle(style: StyleJson, t: MapTokens): StyleJson {
         l.paint!["background-color"] = t.land;
       } else if (l.id === "water") {
         l.paint!["fill-color"] = t.water;
-        delete l.paint!["fill-outline-color"];
+        // A one-pixel coastline so land reads against water at every zoom.
+        l.paint!["fill-outline-color"] = t.coast;
       } else if (l.type === "line" && KEEP_LINES.has(l.id)) {
-        l.paint!["line-color"] = t.lineStrong;
-        l.paint!["line-opacity"] = l.id === "boundary_2" ? 0.9 : 0.6;
+        const country = l.id === "boundary_2";
+        l.paint!["line-color"] = country ? t.border : t.borderSoft;
+        l.paint!["line-opacity"] = 1;
+        l.paint!["line-width"] = country
+          ? ["interpolate", ["linear"], ["zoom"], 2, 0.8, 6, 1.4, 10, 2]
+          : ["interpolate", ["linear"], ["zoom"], 3, 0.5, 6, 0.9, 10, 1.4];
         delete l.paint!["line-dasharray"];
         // State and province lines only. The stock filter compares a possibly-missing number and logs warnings.
         if (l.id === "boundary_3") {
@@ -110,8 +124,10 @@ export function recolorStyle(style: StyleJson, t: MapTokens): StyleJson {
         }
         l.paint!["text-color"] = t.label;
         l.paint!["text-halo-color"] = t.land;
-        l.paint!["text-halo-width"] = 0;
-        if (l.id === "label_state") l.paint!["text-opacity"] = 0.7;
+        l.paint!["text-halo-width"] = 1;
+        l.paint!["text-halo-blur"] = 0.5;
+        if (l.id === "label_state") l.paint!["text-opacity"] = 0.8;
+        if (l.id.startsWith("label_country")) l.paint!["text-opacity"] = 0.9;
       } else {
         hide();
       }
