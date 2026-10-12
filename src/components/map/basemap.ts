@@ -24,12 +24,12 @@ export interface MapTokens {
 }
 
 const FALLBACK_TOKENS: MapTokens = {
-  water: "#0a0b0d",
-  land: "#211e1a",
-  label: "#a39b8f",
-  coast: "#3d3832",
-  border: "#6b635a",
-  borderSoft: "#4a443e",
+  water: "#0e1014",
+  land: "#2e2a25",
+  label: "#c9c1b4",
+  coast: "#5a534b",
+  border: "#938a7e",
+  borderSoft: "#6b635a",
   line: "#2b2825",
   lineStrong: "#403b36",
   spot: "#f2a93b",
@@ -105,8 +105,8 @@ export function recolorStyle(style: StyleJson, t: MapTokens): StyleJson {
         l.paint!["line-color"] = country ? t.border : t.borderSoft;
         l.paint!["line-opacity"] = 1;
         l.paint!["line-width"] = country
-          ? ["interpolate", ["linear"], ["zoom"], 2, 0.8, 6, 1.4, 10, 2]
-          : ["interpolate", ["linear"], ["zoom"], 3, 0.5, 6, 0.9, 10, 1.4];
+          ? ["interpolate", ["linear"], ["zoom"], 2, 1, 6, 1.6, 10, 2.2]
+          : ["interpolate", ["linear"], ["zoom"], 3, 0.7, 6, 1.1, 10, 1.6];
         delete l.paint!["line-dasharray"];
         // State and province lines only. The stock filter compares a possibly-missing number and logs warnings.
         if (l.id === "boundary_3") {
