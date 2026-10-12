@@ -39,18 +39,39 @@ const FALLBACK_TOKENS: MapTokens = {
   inkMuted: "#a69e92",
 };
 
+type Ground = Pick<MapTokens, "water" | "land" | "label" | "coast" | "border" | "borderSoft">;
+
+/**
+ * Every ground shade the map has shipped with, darkest first. `?ground=<name>` on any map page previews one on the
+ * live map without a deploy; the stylesheet tokens stay the source of truth for the default.
+ */
+export const GROUND_PRESETS: Record<string, Ground> = {
+  dark: { water: "#0a0b0d", land: "#211e1a", label: "#a39b8f", coast: "#3d3832", border: "#6b635a", borderSoft: "#4a443e" },
+  dim: { water: "#0e1014", land: "#2e2a25", label: "#c9c1b4", coast: "#5a534b", border: "#938a7e", borderSoft: "#6b635a" },
+  mid: { water: "#1e2128", land: "#534d45", label: "#efe8dc", coast: "#8d857a", border: "#cbc2b4", borderSoft: "#a39a8d" },
+  light: { water: "#aeb5bf", land: "#ddd7cd", label: "#2b2825", coast: "#8a8378", border: "#5a534b", borderSoft: "#8a8279" },
+  paper: { water: "#c9cfd7", land: "#f3efe8", label: "#2b2825", coast: "#a39b90", border: "#5a534b", borderSoft: "#8a8279" },
+};
+
+function groundOverride(): Ground | undefined {
+  if (typeof location === "undefined") return undefined;
+  const name = new URLSearchParams(location.search).get("ground");
+  return name ? GROUND_PRESETS[name] : undefined;
+}
+
 /** MapLibre paint properties need literal colors, so resolve the CSS custom properties once. */
 export function readMapTokens(): MapTokens {
   if (typeof document === "undefined") return FALLBACK_TOKENS;
   const cs = getComputedStyle(document.documentElement);
   const read = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback;
+  const g = groundOverride();
   return {
-    water: read("--map-water", FALLBACK_TOKENS.water),
-    land: read("--map-land", FALLBACK_TOKENS.land),
-    label: read("--map-label", FALLBACK_TOKENS.label),
-    coast: read("--map-coast", FALLBACK_TOKENS.coast),
-    border: read("--map-border", FALLBACK_TOKENS.border),
-    borderSoft: read("--map-border-soft", FALLBACK_TOKENS.borderSoft),
+    water: g?.water ?? read("--map-water", FALLBACK_TOKENS.water),
+    land: g?.land ?? read("--map-land", FALLBACK_TOKENS.land),
+    label: g?.label ?? read("--map-label", FALLBACK_TOKENS.label),
+    coast: g?.coast ?? read("--map-coast", FALLBACK_TOKENS.coast),
+    border: g?.border ?? read("--map-border", FALLBACK_TOKENS.border),
+    borderSoft: g?.borderSoft ?? read("--map-border-soft", FALLBACK_TOKENS.borderSoft),
     line: read("--line", FALLBACK_TOKENS.line),
     lineStrong: read("--line-strong", FALLBACK_TOKENS.lineStrong),
     spot: read("--spot", FALLBACK_TOKENS.spot),
