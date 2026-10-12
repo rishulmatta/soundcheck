@@ -8,6 +8,8 @@ import { ProvenanceFooter } from "./ProvenanceFooter";
 import { QuadrantChart } from "./QuadrantChart";
 import { RouteSketch, projectPlan } from "./RouteSketch";
 import { RouteStrip } from "./RouteStrip";
+import { staticEconomics } from "@/lib/economics";
+import { RouteEconomicsStrip } from "./RouteEconomics";
 import { ACT_TYPE_LABEL, formatDate, planParams } from "./format";
 import { ActLinks, ActPortrait } from "./ActIdentity";
 import "./print.css";
@@ -22,6 +24,7 @@ export function PrintView({ plan }: { plan: Plan }) {
   const sketch = projectPlan(plan);
   const untapped = plan.stops.filter((s) => s.city.quadrant === "untapped");
   const pool = plan.candidates.length;
+  const econ = staticEconomics(plan);
   return (
     <div className="print-root bg-bg px-4 py-8 print:p-0">
       <PrintTheme />
@@ -80,6 +83,7 @@ export function PrintView({ plan }: { plan: Plan }) {
           <p className="mt-2 text-xs leading-4 text-ink-muted">Left: route and heat by fan affinity. Right: affinity against popularity for {pool} candidate cities; the shaded cell is primed but untapped.</p>
 
           <RouteStrip stops={plan.stops} animate={false} interactive={false} className="mt-6" />
+          <RouteEconomicsStrip stops={plan.stops} region={plan.input.region} state={{ tier: econ.tier, rates: econ.rates, units: econ.units, economics: econ.economics }} editable={false} className="mt-4" />
           <ProvenanceFooter plan={plan} className="mt-6" />
         </section>
 
@@ -89,7 +93,7 @@ export function PrintView({ plan }: { plan: Plan }) {
               {act.name} · stop <span className="num">{s.order}</span> of <span className="num">{plan.stops.length}</span>
               {s.legDays > 0 && <> · <span className="num">{s.legDays}</span> travel days from the previous stop</>}
             </p>
-            <CityCard stop={s} poolSize={pool} animate={false} print className="p-6" />
+            <CityCard stop={s} poolSize={pool} animate={false} print className="p-6" breakEven={econ.breakEven.get(s.order) ? { b: econ.breakEven.get(s.order)!, units: econ.units, rates: econ.rates } : undefined} />
             {s.city.quadrant === "untapped" && (
               <p className="mt-3 flex items-center gap-2 text-[13px] leading-[18px] text-ink-muted">
                 <MarketBadge quadrant="untapped" size="sm" /> High affinity, low popularity. An early-announce market.

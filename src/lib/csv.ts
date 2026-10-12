@@ -1,5 +1,6 @@
 /** CSV export of a plan: one row per stop. Pure; RFC 4180 quoting, CRLF line endings. */
 import type { Plan, Stop } from "@/lib/types";
+import { ratesFor, routeEconomics, stopBreakEven, unitsFor, type Leg, type Rates } from "@/lib/economics";
 
 export const CSV_COLUMNS = [
   "order",
@@ -20,6 +21,13 @@ export const CSV_COLUMNS = [
   "places",
   "suggestion",
   "whyHere",
+  "legDistance",
+  "distanceUnit",
+  "legFlight",
+  "legCostEst",
+  "currency",
+  "suggestedCapacity",
+  "breakEvenTickets",
 ] as const;
 
 type Cell = string | number | null | undefined;
@@ -37,8 +45,18 @@ export function topAgeBucket(stop: Stop): string {
   return best?.bucket ?? "";
 }
 
-function stopRow(stop: Stop): Cell[] {
+interface Econ {
+  unit: string;
+  currency: string;
+  rates: Rates;
+  actPopularity?: number;
+  legs: Leg[];
+}
+
+function stopRow(stop: Stop, e: Econ): Cell[] {
   const c = stop.city;
+  const leg = e.legs.find((l) => l.to === stop.order);
+  const b = stopBreakEven(stop, e.actPopularity, e.rates, leg);
   return [
     stop.order,
     c.name,
@@ -58,10 +76,21 @@ function stopRow(stop: Stop): Cell[] {
     stop.places.map((p) => p.name).join(" | "),
     stop.suggestion,
     stop.whyHere,
+    leg?.distance ?? 0,
+    e.unit,
+    leg ? (leg.flight ? "yes" : "no") : "",
+    leg && !leg.flight ? leg.cost : "",
+    e.currency,
+    b.capacity,
+    b.tickets ?? "",
   ];
 }
 
+/** Economics columns use the plan's budget tier at Soundcheck's default rates (the UI lets the user edit them; the CSV does not). */
 export function planToCsv(plan: Plan): string {
-  const lines = [CSV_COLUMNS.join(","), ...plan.stops.map((s) => stopRow(s).map(csvCell).join(","))];
+  const units = unitsFor(plan.input.region);
+  const rates = ratesFor(plan.input.budgetTier, units);
+  const econ: Econ = { ...units, rates, actPopularity: plan.act.popularity, legs: routeEconomics(plan.stops, rates, units.unit).legs };
+  const lines = [CSV_COLUMNS.join(","), ...plan.stops.map((s) => stopRow(s, econ).map(csvCell).join(","))];
   return lines.join("\r\n") + "\r\n";
 }

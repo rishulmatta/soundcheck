@@ -89,11 +89,14 @@ Findings from building the Qloo layer against the live docs on 2026-10-12. Each 
 - Three hero demos only: musician, comedian, live podcast. Other act types marked experimental.
 - Static curated city pools per region; Qloo locality search only for custom cities.
 - Nearest-neighbor routing with 1 travel day between stops.
+- Cost model stays at route economics (distance, days, crew, editable rates, break-even). No hotel or flight prices per city.
 - Print-to-PDF via styled page, not a PDF library.
 - Hosting and Redis on Railway (user's paid account); only free resources otherwise. No Vercel, no Upstash.
 - Repo private until the public README is written. Devpost rules (verified 2026-10-11) require a public repo with a visible license at submission; nothing requires it public during the build.
 
 - [x] **Act identity (2026-10-12):** the plan header and print cover show the resolved act's picture, a one-line description and "Confirm" links (Wikipedia, official site, Spotify, Apple Podcasts, YouTube, Instagram, X, IMDb). Fetched online at run time in `src/lib/actProfile.ts`: Qloo entity image / `external` ids first (live key), Wikipedia REST + Wikidata as the free fallback (works in mock mode). Cached in KV under `profile:v2:*`. Tests stub the lookup (`RunDeps.profile`). Stored plans without the fields parse fine (`links` defaults to []).
+
+- [x] **Route economics (2026-10-12):** the plan page, print cover and CSV now carry Soundcheck's travel-cost model: road distance per leg (great-circle × 1.25), travel and crew days, a travel-and-crew estimate from per-mile and per-day rates by budget tier (van / bus / production; `PlanInput.budgetTier`, default bus, chosen under Advanced on the landing form), flight-flagged legs over the tier's overnight-drive threshold (left unpriced), and a per-city break-even (leg in + one show day against the suggested room at an assumed ticket). Rates are editable on the plan with a reset. Everything is tagged "Soundcheck estimate", never Qloo. Model in `src/lib/economics.ts` (`suggestCapacity` moved here from run.ts), UI in `src/components/plan/RouteEconomics.tsx`. Decision: no per-city hotel or flight prices, ever; there is no reliable free source and invented precision would hurt with the Live Nation judge. Stored plans without `budgetTier` parse via the zod default.
 
 - **Build cache gotcha (2026-10-12):** Turbopack's build filesystem cache served a stale `globals.css` chunk after a token-only change, both locally and on Railway (which persists `.next/cache`). `experimental.turbopackFileSystemCacheForBuild` is now `false` in `next.config.ts`. If a CSS change ever fails to show up on the live site, check the served chunk's values with curl before anything else.
 

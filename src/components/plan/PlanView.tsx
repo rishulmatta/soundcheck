@@ -10,6 +10,7 @@ import { PlanHeader } from "./PlanHeader";
 import { ProvenanceFooter } from "./ProvenanceFooter";
 import { QuadrantChart } from "./QuadrantChart";
 import { RouteStrip } from "./RouteStrip";
+import { RouteEconomicsStrip, useEconomics } from "./RouteEconomics";
 import { SiteBar } from "./SiteBar";
 import { TraceRail } from "./TraceRail";
 import { WithoutQlooPanel } from "./WithoutQlooPanel";
@@ -38,6 +39,7 @@ export function PlanView({ plan }: { plan: Plan }) {
   const sel = useStopSelection();
   const [comparing, setComparing] = useState(false);
   const pool = plan.candidates.length;
+  const econ = useEconomics(plan);
 
   return (
     <div className="mx-auto w-full max-w-[1280px] px-4 pb-16 lg:px-12">
@@ -76,10 +78,25 @@ export function PlanView({ plan }: { plan: Plan }) {
           }}
         />
 
+        <RouteEconomicsStrip
+          stops={plan.stops}
+          region={plan.input.region}
+          state={econ}
+          hoveredStop={sel.hovered}
+          onHoverStop={sel.setHovered}
+          onSelectStop={(order) => {
+            sel.setSelected(order);
+            scrollToStop(order);
+          }}
+        />
+
         <section aria-label="City by city" className="flex flex-col gap-4">
-          {plan.stops.map((s) => (
-            <CityCard key={s.order} stop={s} poolSize={pool} selected={sel.selected === s.order} hovered={sel.hovered === s.order} onSelect={sel.toggle} onHover={sel.setHovered} />
-          ))}
+          {plan.stops.map((s) => {
+            const b = econ.breakEven.get(s.order);
+            return (
+              <CityCard key={s.order} stop={s} poolSize={pool} selected={sel.selected === s.order} hovered={sel.hovered === s.order} onSelect={sel.toggle} onHover={sel.setHovered} breakEven={b ? { b, units: econ.units, rates: econ.rates } : undefined} />
+            );
+          })}
         </section>
 
         <TraceRail variant="footer" steps={plan.trace} summary={plan.summary} />

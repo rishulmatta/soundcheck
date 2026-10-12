@@ -10,6 +10,8 @@ import { WhyPopover } from "@/components/ui/WhyPopover";
 import { CountUp, useInView } from "@/components/ui/motion";
 import { cn } from "@/components/ui/cn";
 import { splitFigures } from "./format";
+import { BreakEvenLine } from "./RouteEconomics";
+import type { BreakEven, Rates, Units } from "@/lib/economics";
 
 interface Props {
   stop: Stop;
@@ -23,6 +25,8 @@ interface Props {
   animate?: boolean;
   /** Print view: reasons shown inline instead of in popovers, no interaction. */
   print?: boolean;
+  /** Travel-and-crew break-even for this stop, from the route economics state. Omitted: no line. */
+  breakEven?: { b: BreakEven; units: Units; rates: Rates };
   className?: string;
 }
 
@@ -57,7 +61,7 @@ function PickRows({ picks, kind, showOverlap, print }: { picks: Pick[]; kind: st
 }
 
 /** One card per stop. Affinity counts up when the card scrolls into view; audience bars fill after it. */
-export function CityCard({ stop, poolSize, selected = false, hovered = false, onSelect, onHover, animate = true, print = false, className }: Props) {
+export function CityCard({ stop, poolSize, selected = false, hovered = false, onSelect, onHover, animate = true, print = false, breakEven, className }: Props) {
   const { city, demographics, openers, sponsors, places } = stop;
   const [ref, inView] = useInView<HTMLElement>(animate);
   const play = inView;
@@ -110,6 +114,11 @@ export function CityCard({ stop, poolSize, selected = false, hovered = false, on
           <div>
             <div className="label mb-1">Soundcheck suggests</div>
             <p className="text-[15px] leading-[22px]">{stop.suggestion}</p>
+            {breakEven && (
+              <div className="mt-1.5">
+                <BreakEvenLine b={breakEven.b} units={breakEven.units} rates={breakEven.rates} />
+              </div>
+            )}
           </div>
         </div>
 

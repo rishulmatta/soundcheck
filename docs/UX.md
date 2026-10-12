@@ -74,8 +74,14 @@ Same layout as the finished plan, but the content fills in as the agent works. L
 ├───────────────────────────────┴──────────────────────────────────────┤
 │ ROUTE  ①Seattle →2d→ ②Boise →1d→ ③SLC →2d→ ④Denver → … → ⑫NYC         │
 ├──────────────────────────────────────────────────────────────────────┤
+│ ROUTE ECONOMICS  [Soundcheck estimate]  Bus and truck                 │
+│ Road 4,415 mi · Travel days 14 · Crew days 192 · Travel+crew $87,400  │
+│ ①→② 505 mi 2d $8.4k  ②→③ 371 mi 1d $4.1k  … ⑧→⑨ 642 mi 2d FLY        │
+│ ▸ Assumptions: $2.40/mi · $3,200/day · 8 crew · $45 ticket (editable) │
+├──────────────────────────────────────────────────────────────────────┤
 │ ┌─ ② BOISE ──────────────────────────────────────────── Untapped ─┐  │
 │ │ Affinity 0.91 (rank 3/38) · Popularity 0.22 · Suggest 1.2k room │  │
+│ │ Break-even 162 tickets, 25% of the room (leg in + one show day) │  │
 │ │ Audience  18-24 ▇▇▇▇ 25-34 ▇▇▇▇▇▇ 35-44 ▇▇ · F 58% M 42%         │  │
 │ │ Openers   Act A (fan overlap 71%) · Act B (64%) · Act C (58%)   │  │
 │ │ Sponsors  Brand X · Brand Y · Brand Z  (why ▸)                  │  │
@@ -94,7 +100,8 @@ Same layout as the finished plan, but the content fills in as the agent works. L
 - **Header:** act with a verified-entity chip, run parameters, momentum badge from `/v2/trending`, and the three actions. "Without Qloo" toggles a side-by-side column showing a plain-LLM plan for the same inputs.
 - **Map + quadrant** sit side by side above the fold. Hovering a quadrant dot highlights the matching map pin and city card. This pair is the screenshot that goes first on Devpost.
 - **Route strip:** horizontal, numbered stops with travel-day gaps. Clicking a stop scrolls to its card.
-- **City cards:** one per stop, each with a quadrant label (Untapped / Established / Reach), affinity and popularity numbers, audience bars from demographics, openers with `/v2/analysis/compare` overlap, sponsors and activations each with a "why" popover from `feature.explainability`, and a one-line "Why here" sentence. Thin data shows a muted "Limited Qloo data" band instead of an empty section.
+- **Route economics strip (added 2026-10-12):** under the route. Four stats (road distance, travel days, crew days, travel-and-crew estimate), one chip per leg with its distance, days and cost, and a collapsed "Assumptions" row where the budget tier and five rates (per mile or km, per day on the road, crew size, average ticket, fly-over threshold) are editable; a reset link appears once edited. Every number carries the "Soundcheck estimate" tag, never the Qloo tag. Legs over the tier's threshold are flagged "fly" in the warn colour and left unpriced. The footnote states what is excluded (venue hire, production, the act's fee, hotels, flights). Rationale: promoters cost a tour by dead days and drive length, not by hotel prices per city; the strip turns the travel-day gaps into money without inventing prices Qloo cannot supply. `src/lib/economics.ts` holds the model, `src/components/plan/RouteEconomics.tsx` the strip and the shared state hook.
+- **City cards:** one per stop, each with a quadrant label (Untapped / Established / Reach), affinity and popularity numbers, a break-even line under "Soundcheck suggests" (tickets and share of the suggested room that cover the leg in plus one show day at the assumed ticket; turns warn above 70%; reads "flight leg in, not priced" when the leg is flown), audience bars from demographics, openers with `/v2/analysis/compare` overlap, sponsors and activations each with a "why" popover from `feature.explainability`, and a one-line "Why here" sentence. Thin data shows a muted "Limited Qloo data" band instead of an empty section.
 - **Agent trace** collapses to a footer bar on the finished plan and expands to the full rail from Screen 2.
 - **Provenance footer** on every plan satisfies the kit's safe-use rules.
 
@@ -160,7 +167,7 @@ The full rules, easings and durations live in the design system's brand book (Mo
 
 ## Print view (`/plan/[id]/print`)
 
-Light theme, one city per page after a cover page with map and quadrant, no interactive elements. Browser "Save as PDF" produces the promoter deliverable. CSV is one row per stop with all scores, openers, sponsors, venues.
+Light theme, one city per page after a cover page with map and quadrant, no interactive elements. The cover carries the route economics strip in its static form (assumptions as one line of text) and each city page carries the break-even line, both at the plan's budget tier and default rates. Browser "Save as PDF" produces the promoter deliverable. CSV is one row per stop with all scores, openers, sponsors, venues, plus leg distance and unit, flight flag, leg cost estimate, currency, suggested capacity and break-even tickets, all at default rates.
 
 ## Map ground: light on dark (decided 2026-10-12)
 

@@ -16,6 +16,7 @@ import { putPlan } from "@/lib/store";
 import { fetchActProfile, type ActProfile } from "@/lib/actProfile";
 import { Plan, PlanInput, type ActType, type CityPoolEntry, type CityScore, type Demographics, type Momentum, type Pick as PickT, type PlanEvent, type Stop, type ToolStatus } from "@/lib/types";
 import { matchesCity } from "@/lib/routing";
+import { suggestCapacity } from "@/lib/economics";
 import { cityPoolFor, spreadPick } from "./pool";
 import { agentPrompt, AGENT_INSTRUCTIONS, withoutQlooPrompt } from "./prompts";
 import { createAnthropicModel, type AgentModel, type StopCopy } from "./model";
@@ -237,15 +238,6 @@ function median(xs: number[]): number {
   const s = [...xs].sort((a, b) => a - b);
   const m = Math.floor(s.length / 2);
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-}
-
-/** Soundcheck's own venue-size heuristic (not a Qloo output): metro size scaled by affinity, local popularity and act popularity. */
-export function suggestCapacity(city: CityScore, actPopularity = 0.5): number {
-  const metro = city.metroM ?? 1;
-  const base = 250 + 540 * Math.sqrt(metro);
-  const raw = base * (0.4 + 0.6 * city.affinity) * (0.5 + 0.5 * city.popularity) * (0.5 + actPopularity);
-  const clamped = Math.min(6000, Math.max(150, raw));
-  return clamped < 1000 ? Math.round(clamped / 50) * 50 : Math.round(clamped / 100) * 100;
 }
 
 /** Announce lead time in weeks: untapped markets need a longer runway; momentum shortens or lengthens it. */

@@ -29,6 +29,10 @@ export type ActType = z.infer<typeof ActType>;
 export const Region = z.enum(["north-america", "uk-ireland", "europe"]);
 export type Region = z.infer<typeof Region>;
 
+/** How the tour moves. Picks Soundcheck's travel-cost assumptions; every rate stays editable on the plan. */
+export const BudgetTier = z.enum(["van", "bus", "production"]);
+export type BudgetTier = z.infer<typeof BudgetTier>;
+
 export const PlanInput = z.object({
   actQuery: z.string().min(1),
   /** Qloo entity id once resolved; the agent resolves it when absent. */
@@ -40,6 +44,7 @@ export const PlanInput = z.object({
   window: z.string().optional(),
   lockedCities: z.array(z.string()).default([]),
   excludedCities: z.array(z.string()).default([]),
+  budgetTier: BudgetTier.default("bus"),
 });
 export type PlanInput = z.infer<typeof PlanInput>;
 

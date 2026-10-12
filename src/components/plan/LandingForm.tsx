@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
-import { ActType, PlanInput, Region } from "@/lib/types";
+import { ActType, BudgetTier, PlanInput, Region } from "@/lib/types";
+import { BUDGET_TIER_HINT, BUDGET_TIER_LABEL } from "@/lib/economics";
 import { Button } from "@/components/ui/Button";
 import { ArrowRight } from "@/components/ui/icons";
 import { ACT_TYPE_OPTION, REGION_LABEL } from "./format";
@@ -47,6 +48,7 @@ export function LandingForm() {
   const [window_, setWindow] = useState("Jan–Mar 2027");
   const [locked, setLocked] = useState("");
   const [excluded, setExcluded] = useState("");
+  const [budgetTier, setBudgetTier] = useState<string>("bus");
   const [error, setError] = useState<string | undefined>();
 
   const id = (n: string) => `${uid}-${n}`;
@@ -61,6 +63,7 @@ export function LandingForm() {
       window: window_.trim() || undefined,
       lockedCities: list(locked),
       excludedCities: list(excluded),
+      budgetTier: BudgetTier.safeParse(budgetTier).data,
     });
     if (!parsed.success) {
       const first = parsed.error.issues[0];
@@ -107,7 +110,7 @@ export function LandingForm() {
       </div>
       <details className="group">
         <summary className="inline-flex cursor-pointer select-none items-center gap-1.5 rounded-sm text-[13px] font-semibold leading-[18px] text-ink-muted hover:text-ink">
-          Advanced: locked cities and exclusions
+          Advanced: locked cities, exclusions, budget tier
         </summary>
         <div className="mt-4 grid gap-5 sm:grid-cols-2">
           <Field label="Locked cities" htmlFor={id("locked")} hint="Always on the route. Comma separated.">
@@ -115,6 +118,13 @@ export function LandingForm() {
           </Field>
           <Field label="Excluded cities" htmlFor={id("excluded")} hint="Never routed. Comma separated.">
             <input id={id("excluded")} className={fieldCls} value={excluded} onChange={(e) => setExcluded(e.target.value)} placeholder="Phoenix" />
+          </Field>
+          <Field label="Budget tier" htmlFor={id("budget")} hint={`${BUDGET_TIER_HINT[BudgetTier.safeParse(budgetTier).data ?? "bus"]}. Sets the travel-cost assumptions; every rate stays editable on the plan.`} className="sm:col-span-2">
+            <Select id={id("budget")} value={budgetTier} onChange={setBudgetTier}>
+              {BudgetTier.options.map((o) => (
+                <option key={o} value={o}>{BUDGET_TIER_LABEL[o]}</option>
+              ))}
+            </Select>
           </Field>
         </div>
       </details>

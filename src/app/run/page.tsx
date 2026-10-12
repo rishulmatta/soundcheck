@@ -11,6 +11,7 @@ import { StatusChip } from "@/components/ui/StatusChip";
 import { ArrowLeft } from "@/components/ui/icons";
 import { stagger } from "@/components/ui/stagger";
 import { CityCard } from "@/components/plan/CityCard";
+import { useEconomics } from "@/components/plan/RouteEconomics";
 import { CityCardSkeleton } from "@/components/plan/CityCardSkeleton";
 import { PlanMap, useStopSelection } from "@/components/plan/PlanView";
 import { QuadrantChart } from "@/components/plan/QuadrantChart";
@@ -183,6 +184,7 @@ export default function RunPage() {
     };
   }, [act, input, momentum, candidates, stops, steps]);
 
+  const econ = useEconomics({ input: input ?? undefined, stops, act: act ?? undefined });
   const wanted = input?.stops ?? 10;
   const doneSteps = steps.filter((s) => s.endedAt !== undefined).length;
   const title = act?.name ?? input?.actQuery;
@@ -255,7 +257,7 @@ export default function RunPage() {
           <section aria-label="City by city" className="flex flex-col gap-4">
             {stops.map((stop, i) => (
               <div key={stop.order} className="sc-enter" style={stagger(i, 60)}>
-                <CityCard stop={stop} poolSize={candidates.length} selected={sel.selected === stop.order} hovered={sel.hovered === stop.order} onSelect={sel.toggle} onHover={sel.setHovered} />
+                <CityCard stop={stop} poolSize={candidates.length} selected={sel.selected === stop.order} hovered={sel.hovered === stop.order} onSelect={sel.toggle} onHover={sel.setHovered} breakEven={econ.breakEven.get(stop.order) ? { b: econ.breakEven.get(stop.order)!, units: econ.units, rates: econ.rates } : undefined} />
               </div>
             ))}
             {state.phase === "running" &&

@@ -24,6 +24,7 @@ export const SEEDS: Seed[] = [
       window: "Jan–Mar 2027",
       lockedCities: [],
       excludedCities: [],
+      budgetTier: "bus",
     },
   },
   {
@@ -37,6 +38,7 @@ export const SEEDS: Seed[] = [
       window: "Spring 2027",
       lockedCities: [],
       excludedCities: [],
+      budgetTier: "bus",
     },
   },
   {
@@ -50,6 +52,7 @@ export const SEEDS: Seed[] = [
       window: "Feb 2027",
       lockedCities: [],
       excludedCities: [],
+      budgetTier: "bus",
     },
   },
 ];
