@@ -30,6 +30,18 @@ export type WithoutQloo = z.infer<typeof WithoutQloo>;
  * The model's reading of a free-text revision request, in city names as written. The server resolves names against
  * the pool (src/lib/revision.ts) and reports what did not match; the model never sees ids.
  */
+/** Wire shape: Anthropic structured outputs require every property, so the optional controls are nullable here. */
+const RevisionDraftWire = z.object({
+  lock: z.array(z.string()).max(20),
+  unlock: z.array(z.string()).max(20),
+  drop: z.array(z.string()).max(20),
+  restore: z.array(z.string()).max(20),
+  stops: z.number().int().min(3).max(20).nullable(),
+  window: z.string().max(60).nullable(),
+  budgetTier: BudgetTier.nullable(),
+  /** One line restating the request as understood, or what could not be done with these controls. */
+  note: z.string().max(300),
+});
 export const RevisionDraft = z.object({
   lock: z.array(z.string()).max(20).default([]),
   unlock: z.array(z.string()).max(20).default([]),
@@ -38,10 +50,22 @@ export const RevisionDraft = z.object({
   stops: z.number().int().min(3).max(20).optional(),
   window: z.string().max(60).optional(),
   budgetTier: BudgetTier.optional(),
-  /** One line restating the request as understood, or what could not be done with these controls. */
   note: z.string().max(300),
 });
 export type RevisionDraft = z.infer<typeof RevisionDraft>;
+
+function fromWire(w: z.infer<typeof RevisionDraftWire>): RevisionDraft {
+  return RevisionDraft.parse({
+    lock: w.lock,
+    unlock: w.unlock,
+    drop: w.drop,
+    restore: w.restore,
+    stops: w.stops ?? undefined,
+    window: w.window ?? undefined,
+    budgetTier: w.budgetTier ?? undefined,
+    note: w.note,
+  });
+}
 
 export interface AgentLoopResult {
   steps: number;
@@ -157,13 +181,13 @@ export function createAnthropicModel(modelId: string = process.env.SOUNDCHECK_MO
         model,
         instructions: REVISE_INSTRUCTIONS,
         prompt,
-        output: Output.object({ schema: RevisionDraft }),
+        output: Output.object({ schema: RevisionDraftWire }),
         abortSignal: signal,
         maxRetries: 1,
         providerOptions: { anthropic: { effort: "low", ...cache } },
       });
       meter?.add(result.totalUsage);
-      return RevisionDraft.parse(result.output);
+      return fromWire(RevisionDraftWire.parse(result.output));
     },
   };
 }
