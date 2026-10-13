@@ -6,7 +6,11 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
 **Deadline:** Oct 30, 2026, 11:45 pm ET. Submit by Oct 29.
 
 ## Last updated
-2026-10-13 (session 4)
+2026-10-13 (session 5)
+
+## Session 5: window field
+
+- Replaced the free-text Window input on the landing form and the revise bar with a month-range picker (`src/components/ui/MonthRangePicker.tsx`, helpers and 12 tests in `src/lib/window.ts`). Month granularity was chosen over a day-level date picker because the planner treats the window as context, not a schedule. Storage stays the prose string, so seeds, schema, revision diffs and the propose endpoint are untouched; the propose prompt now asks for the "Jan–Mar 2027" shape. Verified in headless Chrome on desktop and 390px: open, two-click range, year stepper, Escape, chip "Window Jan–Mar 2027 → Mar–Apr 2027" on the demo plan, no console errors. Typecheck, lint, 210 tests and production build green. Not yet deployed.
 
 ## Session 4: evidence and submission readiness
 
@@ -126,7 +130,7 @@ Findings from building the Qloo layer against the live docs on 2026-10-12. Each 
 - KV choice: Upstash Redis (Marketplace) vs Vercel KV. Pick whichever provisions fastest.
 
 ## Next session starts here
-1. Read the session 4 entry and `docs/VALIDATION.md`. Do not rebuild already-implemented features from historical unchecked lists.
+1. Read the session 4 and 5 entries and `docs/VALIDATION.md`. Do not rebuild already-implemented features from historical unchecked lists.
 2. If the Qloo key has arrived: run the live-data gate and key-day checklist first. Otherwise keep synthetic labels and do not claim geographic validation.
 3. Ask the user to try the revision controls in a browser (drag a stop, Drop and Lock a card, type a request into the revise bar, Re-run) and fix whatever they report. Open questions: should Drop shrink the tour instead of replacing the city; should a city-set change keep the hand order as a backbone rather than discarding it.
 4. Week 1 list: act autocomplete, the small UI issues above. Copy quality: "1x the pool's median" reads oddly for reach cities; consider rounding language or a different lead for the reach quadrant.

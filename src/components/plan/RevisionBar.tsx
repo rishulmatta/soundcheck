@@ -8,6 +8,8 @@ import { isReorderOnly } from "@/lib/revision";
 import { Button } from "@/components/ui/Button";
 import { ChevronDown, X } from "@/components/ui/icons";
 import { cn } from "@/components/ui/cn";
+import { MonthRangePicker } from "@/components/ui/MonthRangePicker";
+import { formatWindow, parseWindow } from "@/lib/window";
 import { RUN_INPUT_KEY } from "./runInput";
 import type { DraftItem, RevisionDraft } from "./useRevisionDraft";
 
@@ -60,7 +62,7 @@ export function RevisionBar({ plan, draft }: { plan: Plan; draft: RevisionDraft 
   const { changes, items, empty, count } = draft;
 
   const stopsEdit = useEditText(String(changes.stops ?? plan.input.stops));
-  const windowEdit = useEditText(changes.window ?? plan.input.window ?? "");
+  const windowText = changes.window ?? plan.input.window;
 
   async function propose(e: React.FormEvent) {
     e.preventDefault();
@@ -236,16 +238,13 @@ export function RevisionBar({ plan, draft }: { plan: Plan; draft: RevisionDraft 
               </div>
             </Field>
             <Field label="Window" htmlFor={id("window")} className="col-span-2 sm:col-span-1">
-              <input
+              <MonthRangePicker
                 id={id("window")}
+                value={parseWindow(windowText)}
+                text={windowText}
+                side="top"
                 className={fieldCls}
-                value={windowEdit.value}
-                placeholder="Jan–Mar 2027"
-                onChange={(e) => {
-                  windowEdit.start(e.target.value);
-                  draft.setField("window", e.target.value.trim() || undefined);
-                }}
-                onBlur={windowEdit.end}
+                onChange={(r) => draft.setField("window", r ? formatWindow(r) : undefined)}
               />
             </Field>
           </div>

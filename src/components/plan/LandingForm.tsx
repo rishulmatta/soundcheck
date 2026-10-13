@@ -6,6 +6,8 @@ import { ActType, BudgetTier, PlanInput, Region } from "@/lib/types";
 import { BUDGET_TIER_HINT, BUDGET_TIER_LABEL } from "@/lib/economics";
 import { Button } from "@/components/ui/Button";
 import { ArrowRight } from "@/components/ui/icons";
+import { MonthRangePicker } from "@/components/ui/MonthRangePicker";
+import { formatWindow, type MonthRange } from "@/lib/window";
 import { ACT_TYPE_OPTION, REGION_LABEL } from "./format";
 import { RUN_INPUT_KEY } from "./runInput";
 
@@ -45,7 +47,7 @@ export function LandingForm() {
   const [actType, setActType] = useState<string>("artist");
   const [region, setRegion] = useState<string>("north-america");
   const [stops, setStops] = useState("6");
-  const [window_, setWindow] = useState("Jan–Mar 2027");
+  const [window_, setWindow] = useState<MonthRange | undefined>({ start: { year: 2027, month: 0 }, end: { year: 2027, month: 2 } });
   const [locked, setLocked] = useState("");
   const [excluded, setExcluded] = useState("");
   const [budgetTier, setBudgetTier] = useState<string>("bus");
@@ -60,7 +62,7 @@ export function LandingForm() {
       actType: ActType.safeParse(actType).data,
       region: Region.safeParse(region).data,
       stops: Number(stops),
-      window: window_.trim() || undefined,
+      window: window_ ? formatWindow(window_) : undefined,
       lockedCities: list(locked),
       excludedCities: list(excluded),
       budgetTier: BudgetTier.safeParse(budgetTier).data,
@@ -105,7 +107,7 @@ export function LandingForm() {
           <input id={id("stops")} type="number" min={3} max={20} inputMode="numeric" className={`${fieldCls} num`} value={stops} onChange={(e) => setStops(e.target.value)} />
         </Field>
         <Field label="Window" htmlFor={id("window")} className="sm:col-span-2 md:col-span-1">
-          <input id={id("window")} className={fieldCls} value={window_} onChange={(e) => setWindow(e.target.value)} placeholder="Jan–Mar 2027" />
+          <MonthRangePicker id={id("window")} value={window_} onChange={setWindow} className={fieldCls} />
         </Field>
       </div>
       <details className="group">

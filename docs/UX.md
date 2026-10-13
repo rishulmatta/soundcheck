@@ -38,6 +38,7 @@ Guiding rule: it must look like a promoter's deliverable, not a chatbot. The age
 - Copy is the tour-manager voice from the design system: the headline names the outcome, the paragraph says what is scored, what is found and what you get. No "AI".
 - The form stays at the bottom under its own heading with a one-sentence expectation ("about two minutes"). The top bar's "Plan a tour" and the hero's "Plan your own" jump to it.
 - Act search autocomplete via `/search` is still to do (week 1 list).
+- **Window** is a month-range picker (`MonthRangePicker`): click a start month, click an end month, year stepper for ranges that cross December. The unit is the month on purpose: the planner treats the window as context, not a verified schedule, and day-level dates would imply one. It writes the stored prose ("Jan–Mar 2027", "Dec 2026–Feb 2027"), so the schema, seeds and revision diff are unchanged; `src/lib/window.ts` parses that prose, plus seasons ("Spring 2027") and hand-typed spans, back into months. The revise bar uses the same control, opening upward from the docked bar; a window the model proposed that cannot be parsed stays visible as text until the user picks months.
 
 ## Screen 2: Live run (`/plan/[id]` while streaming)
 
