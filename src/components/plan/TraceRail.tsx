@@ -11,7 +11,7 @@ import "@/components/ui/motion.css";
 export const PLANNED_STEPS: Array<{ id: string; name: string }> = [
   { id: "resolve", name: "Resolve act" },
   { id: "score", name: "Score cities" },
-  { id: "profile", name: "Profile markets" },
+  { id: "profile", name: "Profile overall audience" },
   { id: "momentum", name: "Check momentum" },
   { id: "route", name: "Route tour" },
   { id: "openers", name: "Openers and sponsors" },
@@ -35,6 +35,7 @@ function seconds(step: TraceStep): string | undefined {
 
 function StepRow({ step, running, open, onToggle }: { step: TraceStep; running: boolean; open: boolean; onToggle: () => void }) {
   const dur = seconds(step);
+  const notes = Array.from(new Set(step.calls.flatMap((call) => call.note ? [call.note] : [])));
   return (
     <li className="border-b border-line last:border-b-0">
       <button
@@ -64,10 +65,15 @@ function StepRow({ step, running, open, onToggle }: { step: TraceStep; running: 
           <ChevronRight size={14} />
         </span>
       </button>
+      {notes.length > 0 && (
+        <ul aria-label="Evidence notes" className="space-y-1 px-3 pb-2.5 text-xs leading-4 text-ink-muted">
+          {notes.map((note) => <li key={note}><span className="font-semibold">Evidence note:</span> {note}</li>)}
+        </ul>
+      )}
       {open && (
         <div className="bg-bg-sunken px-3 py-2">
           {step.calls.length === 0 ? (
-            <p className="text-xs leading-4 text-ink-muted">{running ? "Waiting for Qloo." : "No Qloo calls in this step. Computed locally."}</p>
+            <p className="text-xs leading-4 text-ink-muted">{running ? "Waiting for source data." : "No source calls in this step. Computed locally."}</p>
           ) : (
             <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto">
               {step.calls.map((c, i) => (
@@ -76,6 +82,7 @@ function StepRow({ step, running, open, onToggle }: { step: TraceStep; running: 
                   <span className="num mt-0.5 block text-[11px] leading-4 text-ink-faint">
                     {c.status} · {c.ms}ms{c.cached ? " · cached" : ""}
                   </span>
+                  {c.note && <p className="mt-1 text-xs leading-4 text-ink-muted">{c.note}</p>}
                 </li>
               ))}
             </ul>
@@ -109,6 +116,8 @@ export function TraceRail({ steps, variant = "rail", live = false, summary, clas
 
   const seen = new Set(steps.map((s) => s.id));
   const pending = live ? PLANNED_STEPS.filter((p) => !seen.has(p.id)) : [];
+  const notedSteps = steps.filter((step) => step.calls.some((call) => call.note)).length;
+  const limitedSteps = steps.filter((step) => step.status !== "ok").length;
 
   const list = (
     <ol>
@@ -155,7 +164,7 @@ export function TraceRail({ steps, variant = "rail", live = false, summary, clas
         <span className="text-sm font-semibold leading-5">Agent trace</span>
         {summary && (
           <span className="text-[13px] leading-[18px] text-ink-muted">
-            <span className="num">{types}</span> Qloo call types · <span className="num">{calls}</span> calls
+            <span className="num">{types}</span> recorded call types · <span className="num">{calls}</span> calls
           </span>
         )}
         {summary && <StatusChip status={summary.overallStatus} size="sm" />}
@@ -166,6 +175,11 @@ export function TraceRail({ steps, variant = "rail", live = false, summary, clas
         )}
         <span className="ml-auto text-[13px] leading-[18px] text-ink-muted">{expanded ? "Hide calls" : "Show redacted calls"}</span>
       </button>
+      {(notedSteps > 0 || limitedSteps > 0) && (
+        <p className="border-t border-line px-4 py-2 text-[13px] leading-[18px] text-ink-muted">
+          <span className="font-semibold text-ink">Evidence limitations:</span> {notedSteps} {notedSteps === 1 ? "step has" : "steps have"} source notes; {limitedSteps} {limitedSteps === 1 ? "step has" : "steps have"} incomplete data. Open the trace to inspect the affected decisions.
+        </p>
+      )}
       {expanded && <div className="sc-fade border-t border-line">{list}</div>}
     </section>
   );

@@ -18,6 +18,8 @@ import { Plan, PlanInput, type ActType, type ChangeSet, type CityPoolEntry, type
 import { matchesCity } from "@/lib/routing";
 import { isReorderOnly, reorderStops } from "@/lib/revision";
 import { suggestCapacity } from "@/lib/economics";
+import { createProvenance, provenanceFor, safePlanForDisplay } from "@/lib/provenance";
+import { sameComparisonBrief, validateWithoutQloo } from "./comparison";
 import { cityPoolFor, spreadPick } from "./pool";
 import { agentPrompt, AGENT_INSTRUCTIONS, withoutQlooPrompt } from "./prompts";
 import { createAnthropicModel, promptCacheEnabled, UsageMeter, type AgentModel, type StopCopy } from "./model";
@@ -238,19 +240,11 @@ function defaultPicks(ctx: RunContext, cityId: string) {
 
 /* ---------------------------------------------------------- stop assembly */
 
-const pct = (n: number) => `${Math.round(n * 100)}%`;
 const QUADRANT_LABEL: Record<CityScore["quadrant"], string> = {
-  untapped: "primed but untapped market",
-  established: "established market",
-  reach: "reach market",
+  untapped: "high-affinity, lower-popularity candidate",
+  established: "high-affinity, higher-popularity candidate",
+  reach: "lower-affinity candidate",
 };
-
-function median(xs: number[]): number {
-  if (!xs.length) return 0;
-  const s = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-}
 
 /** Announce lead time in weeks: untapped markets need a longer runway; momentum shortens or lengthens it. */
 export function announceWeeks(quadrant: CityScore["quadrant"], trend: Momentum["trend"]): [number, number] {
@@ -261,7 +255,7 @@ export function announceWeeks(quadrant: CityScore["quadrant"], trend: Momentum["
 }
 
 function toPick(e: RelatedEntity, reason: string, overlap?: number): PickT {
-  return { id: e.id, name: e.name, overlap, reason, tags: e.tags.slice(0, 4) };
+  return { id: e.id, name: e.name, tasteSimilarity: overlap, reason, tags: e.tags.slice(0, 4) };
 }
 
 function buildPicks(ctx: RunContext, city: CityScore): Pick<Stop, "openers" | "sponsors" | "places"> {
@@ -275,7 +269,9 @@ function buildPicks(ctx: RunContext, city: CityScore): Pick<Stop, "openers" | "s
     .map((e) => {
       const ov = state.overlaps.get(e.id);
       const has = ov && (ov.status === "ok" || ov.status === "partial");
-      const base = has ? `Qloo compare: ${pct(ov.overlap)} audience overlap with ${act.name}.` : `Qloo ranks it among acts that ${city.name} audiences of ${act.name} also favour.`;
+      const base = has
+        ? `Derived taste similarity ${ov.overlap.toFixed(2)} from compare results for ${act.name}; not a percentage of shared fans.`
+        : `Related-act candidate from taste-affinity results for ${act.name}; local connection and availability need verification.`;
       return toPick(e, e.explanation ? `${base} ${e.explanation}` : base, has ? ov.overlap : undefined);
     });
   const demo = state.cityDemographics.get(city.id);
@@ -288,7 +284,7 @@ function buildPicks(ctx: RunContext, city: CityScore): Pick<Stop, "openers" | "s
       toPick(
         e,
         e.explanation ??
-          `Qloo brand affinity with ${act.name}'s audience${ages.length ? `, which over-indexes ${ages.join(" and ")} in ${city.name}` : ""}.`,
+          `Brand-affinity candidate for ${act.name}'s overall audience${ages.length ? `; act-wide age scores over-index for ${ages.join(" and ")}` : ""}. Sponsorship interest is unverified.`,
       ),
     );
   const placeItems = state.places.get(city.id)?.items ?? [];
@@ -297,7 +293,7 @@ function buildPicks(ctx: RunContext, city: CityScore): Pick<Stop, "openers" | "s
     .map((id) => placeItems.find((e) => e.id === id))
     .filter((e): e is RelatedEntity => Boolean(e))
     .map((e) =>
-      toPick(e, e.explanation ?? `Qloo place affinity with ${act.name} in ${city.name}${venueTagNames.length ? `, matching ${venueTagNames.slice(0, 2).join(" / ")}` : ""}.`),
+      toPick(e, e.explanation ?? `Place-affinity candidate for ${act.name}, requested around ${city.name}${venueTagNames.length ? ` with a ${venueTagNames.slice(0, 2).join(" / ")} brief` : ""}. Location, suitability and availability need checking.`),
     );
   return { openers, sponsors, places };
 }
@@ -310,8 +306,6 @@ export function copyFacts(ctx: RunContext, city: CityScore, legDays: number, dem
   const { state, input } = ctx;
   const act = state.act!;
   const cands = state.candidates ?? [];
-  const med = median(cands.map((c) => c.affinity));
-  const multiple = med > 0 ? Math.round((city.affinity / med) * 10) / 10 : 1;
   const trend = state.momentum?.trend ?? "unknown";
   const [w1, w2] = announceWeeks(city.quadrant, trend);
   return {
@@ -320,20 +314,24 @@ export function copyFacts(ctx: RunContext, city: CityScore, legDays: number, dem
     city: city.name,
     country: city.country,
     qloo: {
+      dataMode: ctx.qloo.mode ?? "unknown",
+      heatmapComparability: "unverified",
+      demographicsScope: "act-wide",
       affinity: city.affinity,
       popularity: city.popularity,
-      affinityRank: city.affinityRank,
-      citiesScored: cands.length,
-      affinityMultipleVsPoolMedian: multiple,
       topAgeBuckets: topAgeBuckets(demo),
       femaleScoreVsBaseline: demo.gender.female,
       momentum: trend,
     },
     soundcheck: {
+      heuristicRank: city.affinityRank,
+      citiesScored: cands.length,
       quadrant: city.quadrant,
       quadrantLabel: QUADRANT_LABEL[city.quadrant],
       underserved: city.underserved,
       suggestedCapacity: suggestCapacity(city, act.popularity ?? 0.5),
+      capacityBasis: "Unvalidated room-size planning assumption; not a forecast of ticket demand",
+      timingBasis: "Heuristic announcement window; no booking or availability data",
       announceWeeksMin: w1,
       announceWeeksMax: w2,
       travelDaysFromPreviousStop: legDays,
@@ -348,11 +346,11 @@ export function copyFacts(ctx: RunContext, city: CityScore, legDays: number, dem
  * sentence lands on the same template. Picks only angles the facts can support, rotating by tour order.
  */
 export function leadAngle(order: number, demo: Demographics, trend: string, legDays: number): string {
-  const angles: string[] = ["affinity rank among the cities scored"];
-  if (topAgeBuckets(demo).length) angles.push("the age buckets that over-index");
+  const angles: string[] = ["recorded affinity and popularity; cross-city comparability is unverified"];
+  if (topAgeBuckets(demo).length) angles.push("the act-wide age buckets that over-index (not a local audience profile)");
   if (trend === "rising" || trend === "falling") angles.push("momentum");
   if (legDays > 0) angles.push("the travel days from the previous stop and why the routing works");
-  angles.push("the gap between affinity and popularity");
+  angles.push("provisional heuristic selection; affinity and popularity are separate indices");
   return angles[(order - 1) % angles.length];
 }
 
@@ -361,8 +359,8 @@ type Facts = ReturnType<typeof copyFacts>;
 export function templateCopy(f: Facts): StopCopy {
   const cap = f.soundcheck.suggestedCapacity.toLocaleString("en-US");
   return {
-    suggestion: `${cap}-cap room; announce ${f.soundcheck.announceWeeksMin}–${f.soundcheck.announceWeeksMax} weeks out`,
-    whyHere: `${f.city} shows ${f.qloo.affinityMultipleVsPoolMedian}x the pool's median Qloo affinity for ${f.act} at ${f.qloo.popularity} popularity: a ${f.soundcheck.quadrantLabel}.`,
+    suggestion: `Room-size assumption: ${cap} capacity; validate demand before booking.`,
+    whyHere: `${f.qloo.dataMode === "mock" ? "Synthetic example" : "Provisional heuristic candidate"}: ${f.city} has recorded affinity ${f.qloo.affinity} and popularity ${f.qloo.popularity}; cross-city comparability is unverified.`,
   };
 }
 
@@ -379,6 +377,13 @@ export function copyUsesOnlyGivenNumbers(copy: StopCopy, facts: Facts): boolean 
     if (n > 0 && n <= 1) allowed.add(Math.round(n * 100));
   }
   return numbersIn(`${copy.suggestion} ${copy.whyHere}`).every((n) => allowed.has(n));
+}
+
+/** A numeric whitelist cannot validate claims: require explicit limits and reject known unsupported interpretations. */
+export function copyMeetsEvidenceLimits(copy: StopCopy): boolean {
+  const text = `${copy.suggestion} ${copy.whyHere}`;
+  return /assumption/i.test(copy.suggestion) && /unverified/i.test(copy.whyHere) &&
+    !/\b(?:audience overlap|fan(?:base)? overlap|median|sold out|sells? \d|nobody (?:has )?(?:played|booked)|guaranteed)\b/i.test(text);
 }
 
 /* -------------------------------------------------------------------- run */
@@ -419,8 +424,13 @@ async function cloneReordered(input: PlanInput, baseline: Plan, order: string[],
     endedAt: now(),
   };
   const act = structuredClone(baseline.act);
+  const provenance = provenanceFor(baseline);
+  const comparison = baseline.withoutQloo?.protocolVersion === 2 && sameComparisonBrief(input, baseline.input)
+    ? validateWithoutQloo(baseline.withoutQloo, input, opts.deps?.pool ?? cityPoolFor(input.region)) : undefined;
+  if (baseline.withoutQloo && !comparison?.ok) step.summary += "; saved comparison omitted because its brief or protocol no longer matches";
   const candidates = structuredClone(baseline.candidates);
   const momentum = structuredClone(baseline.momentum);
+  emit({ type: "provenance", provenance });
   emit({ type: "act", act });
   emit({ type: "candidates", candidates });
   emit({ type: "momentum", momentum });
@@ -431,6 +441,7 @@ async function cloneReordered(input: PlanInput, baseline: Plan, order: string[],
     createdAt: new Date(now()).toISOString(),
     ...lineage(baseline, opts.revisionNote),
     input,
+    provenance,
     act,
     momentum,
     candidates,
@@ -442,7 +453,8 @@ async function cloneReordered(input: PlanInput, baseline: Plan, order: string[],
       untappedStops: stops.filter((s) => s.city.quadrant === "untapped").length,
       overallStatus: baseline.summary.overallStatus,
     },
-    withoutQloo: baseline.withoutQloo ? structuredClone(baseline.withoutQloo) : undefined,
+    // A changed manual order changes the comparison brief. Never carry a now-unmatched baseline forward.
+    withoutQloo: comparison?.ok ? { ...comparison.value, protocolVersion: 2 } : undefined,
   });
   try {
     await save(plan);
@@ -491,42 +503,36 @@ function revisionField(ctx: RunContext, baseline: Plan): string[] {
 
 /**
  * Picks for a revised stop whose city was on the parent route. The parent's picks are rebuilt from this run's data;
- * a category where some picked id is no longer in the fetched lists (the parent's model may have used other venue
- * tags or sponsor age buckets) keeps the parent's picks verbatim rather than shrinking.
+ * a category where a saved pick no longer appears in returned candidates must drop it rather than replay old evidence.
  */
-function revisedPicks(rebuilt: Pick<Stop, "openers" | "sponsors" | "places">, parent: Stop): Pick<Stop, "openers" | "sponsors" | "places"> {
-  const pickOf = (now: PickT[], before: PickT[]) => (now.length >= before.length ? now : structuredClone(before));
-  return {
-    openers: pickOf(rebuilt.openers, parent.openers),
-    sponsors: pickOf(rebuilt.sponsors, parent.sponsors),
-    places: pickOf(rebuilt.places, parent.places),
-  };
-}
-
 export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void, opts: RunOptions = {}): Promise<Plan> {
   const input = PlanInput.parse(rawInput);
-  const baseline = opts.baseline;
+  const baseline = opts.baseline ? safePlanForDisplay(opts.baseline) : undefined;
   if (baseline && opts.changes && isReorderOnly(opts.changes, baseline)) {
     return cloneReordered(input, baseline, opts.changes.order!, emit, opts);
   }
   const deps = resolveDeps(input, opts.deps);
   const qloo = deps.qloo;
+  const provenance = createProvenance(qloo.mode ?? "unknown");
+  emit({ type: "provenance", provenance });
+  // Live/mocked ids and evidence cannot be mixed by revising a stored plan after the backend mode changes.
+  const reusableBaseline = baseline && provenanceFor(baseline).dataMode === qloo.mode ? baseline : undefined;
   const excluded = (c: CityPoolEntry) => input.excludedCities.some((k) => matchesCity(c, k));
   const tracer = new Tracer(emit, deps.now);
   const ctx: RunContext = { input, qloo, pool: deps.pool.filter((c) => !excluded(c)), tracer, state: newRunState(), emit, profile: deps.profile };
   const meter = deps.model ? new UsageMeter(deps.model.id, promptCacheEnabled()) : undefined;
 
-  if (baseline) {
+  if (reusableBaseline) {
     // 1'. Revision: no agent loop. The constraints are already decided by the user; the orchestrator re-plans.
     tracer.begin("agent", "Revise");
-    const carried = seedFromBaseline(ctx, baseline);
+    const carried = seedFromBaseline(ctx, reusableBaseline);
     // Re-score the parent's candidate cities (plus any restored or locked city it never scored) rather than the whole
     // pool: the same field keeps the route stable apart from the requested change, and every probe is a cache hit.
-    const field = revisionField(ctx, baseline);
+    const field = revisionField(ctx, reusableBaseline);
     if (field.length) await probeCities(ctx, field, "act");
     tracer.end(
       "agent",
-      `Revision of ${baseline.id}${opts.revisionNote ? `: ${opts.revisionNote}` : ""}. Constraints applied by the orchestrator; Qloo answers reused from cache; ${carried}; ${field.length} cities re-scored`,
+      `Revision of ${reusableBaseline.id}${opts.revisionNote ? `: ${opts.revisionNote}` : ""}. Constraints applied by the orchestrator; Qloo answers reused from cache; ${carried}; ${field.length} cities re-scored`,
     );
   } else {
     // 1. Agent loop.
@@ -584,7 +590,7 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
   const { state } = ctx;
   const order = state.route?.order ?? [];
   const legDays = state.route?.legDays ?? [];
-  const parentStops = [...(baseline?.stops ?? [])].sort((a, b) => a.order - b.order);
+  const parentStops = [...(reusableBaseline?.stops ?? [])].sort((a, b) => a.order - b.order);
   const parentBy = new Map(parentStops.map((s, i) => [s.city.id, { stop: s, prev: i ? parentStops[i - 1].city.id : null }]));
   tracer.begin("explain", "Explain picks");
   let modelCopies = 0;
@@ -599,7 +605,9 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
     const demo = stopDemographics(ctx, city.id);
     const days = legDays[i] ?? 0;
     const parent = parentBy.get(city.id);
-    const sameLeg = parent && parent.prev === (i ? order[i - 1].id : null) && parent.stop.legDays === days;
+    const sameLeg = parent && reusableBaseline?.provenance?.proseVersion === 2 &&
+      reusableBaseline.input.window === input.window && reusableBaseline.input.budgetTier === input.budgetTier &&
+      parent.prev === (i ? order[i - 1].id : null) && parent.stop.legDays === days;
     let copy: StopCopy;
     if (sameLeg) {
       copy = { suggestion: parent.stop.suggestion, whyHere: parent.stop.whyHere };
@@ -611,7 +619,7 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
         try {
           const signal = opts.signal ? AbortSignal.any([AbortSignal.timeout(30_000), opts.signal]) : AbortSignal.timeout(30_000);
           const c = await deps.model.writeStopCopy(facts, signal, meter);
-          if (copyUsesOnlyGivenNumbers(c, facts)) {
+          if (copyUsesOnlyGivenNumbers(c, facts) && copyMeetsEvidenceLimits(c)) {
             copy = c;
             modelCopies++;
           }
@@ -620,8 +628,8 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
         }
       }
     }
-    const rebuilt = buildPicks(ctx, city);
-    const picks = parent ? revisedPicks(rebuilt, parent.stop) : rebuilt;
+    // Keep only picks supported by this run's returned candidates, never stale saved recommendations.
+    const picks = buildPicks(ctx, city);
     const stop: Stop = { order: i + 1, city, legDays: days, demographics: demo, ...picks, ...copy };
     stops[i] = stop;
     flush();
@@ -633,15 +641,35 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
     : `city copy by ${deps.model ? `model for ${modelCopies}/${stops.length} stops` : "template"}`;
   tracer.end("explain", `explanations on ${explained} of ${picksCount} picks; ${copySummary}`);
 
-  // 4. Optional plain-LLM comparison. A revision carries the parent's over (no extra model call).
+  // 4. Optional plain-LLM comparison, retained only for the same validated comparison brief.
   let withoutQloo: Plan["withoutQloo"];
-  if (baseline) {
-    withoutQloo = baseline.withoutQloo ? structuredClone(baseline.withoutQloo) : undefined;
-  } else if (deps.withoutQloo && deps.model) {
+  if (baseline?.withoutQloo) {
+    const checked = baseline.withoutQloo.protocolVersion === 2 && sameComparisonBrief(input, baseline.input) &&
+      deps.model && baseline.summary.model?.id === deps.model.id
+      ? validateWithoutQloo(baseline.withoutQloo, input, ctx.pool) : undefined;
+    if (checked?.ok) withoutQloo = { ...checked.value, protocolVersion: 2 };
+    else {
+      tracer.begin("comparison", "Comparison baseline");
+      tracer.mark("comparison", "degraded");
+      tracer.end("comparison", checked && !checked.ok ? `Saved comparison omitted: ${checked.reason}` : "Saved comparison omitted: planning brief changed, model identity differs, or comparison protocol is unverified");
+    }
+  } else if (!baseline && deps.withoutQloo && deps.model) {
+    tracer.begin("comparison", "Comparison baseline");
     try {
-      withoutQloo = await deps.model.planWithoutQloo(withoutQlooPrompt(input, ctx.pool), opts.signal, meter);
+      const candidate = await deps.model.planWithoutQloo(withoutQlooPrompt(input, ctx.pool), opts.signal, meter);
+      const checked = validateWithoutQloo(candidate, input, ctx.pool);
+      if (checked.ok) {
+        withoutQloo = { ...checked.value, protocolVersion: 2 };
+        tracer.end("comparison", "Matched brief; city count, candidate pool, locks, exclusions and applicable order checked. One model call without Qloo; tool and compute budgets differ.");
+      }
+      else {
+        tracer.mark("comparison", "degraded");
+        tracer.end("comparison", `Comparison omitted: ${checked.reason}`);
+      }
     } catch {
       withoutQloo = undefined;
+      tracer.mark("comparison", "degraded");
+      tracer.end("comparison", "Comparison omitted: baseline generation or output validation failed");
     }
   }
 
@@ -654,6 +682,7 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
     createdAt: new Date(deps.now()).toISOString(),
     ...lineage(baseline, opts.revisionNote),
     input,
+    provenance,
     act,
     momentum,
     candidates: state.candidates ?? [],

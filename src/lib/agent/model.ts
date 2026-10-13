@@ -10,6 +10,9 @@ import { z } from "zod";
 import { BudgetTier, type ModelUsage } from "@/lib/types";
 import type { AgentToolSpec } from "./tools";
 import { COPY_INSTRUCTIONS, REVISE_INSTRUCTIONS, WITHOUT_QLOO_INSTRUCTIONS } from "./prompts";
+import { WithoutQloo } from "./comparison";
+
+export { WithoutQloo } from "./comparison";
 
 export const DEFAULT_MODEL_ID = "claude-sonnet-5-5";
 
@@ -18,13 +21,6 @@ export const StopCopy = z.object({
   whyHere: z.string().min(1).max(320),
 });
 export type StopCopy = z.infer<typeof StopCopy>;
-
-export const WithoutQloo = z.object({
-  cities: z.array(z.string()).max(20),
-  openers: z.array(z.string()).max(10),
-  note: z.string().max(600),
-});
-export type WithoutQloo = z.infer<typeof WithoutQloo>;
 
 /**
  * The model's reading of a free-text revision request, in city names as written. The server resolves names against
@@ -108,7 +104,7 @@ export interface AgentModel {
   }): Promise<AgentLoopResult>;
   /** Phrase one stop's suggestion and whyHere from the given facts. */
   writeStopCopy(facts: Record<string, unknown>, signal?: AbortSignal, meter?: UsageMeter): Promise<StopCopy>;
-  /** Plain-LLM plan for the "Without Qloo" toggle. */
+  /** Same-model shortlist without Qloo tools; one call, so execution budgets are not matched. */
   planWithoutQloo(prompt: string, signal?: AbortSignal, meter?: UsageMeter): Promise<WithoutQloo>;
   /** Turn a free-text revision request into a RevisionDraft over the plan's controls. One small call. */
   proposeRevision(prompt: string, signal?: AbortSignal, meter?: UsageMeter): Promise<RevisionDraft>;
@@ -171,7 +167,7 @@ export function createAnthropicModel(modelId: string = process.env.SOUNDCHECK_MO
         output: Output.object({ schema: WithoutQloo }),
         abortSignal: signal,
         maxRetries: 1,
-        providerOptions: { anthropic: { effort: "low", ...cache } },
+        providerOptions: { anthropic: { effort: "medium", ...cache } },
       });
       meter?.add(result.totalUsage);
       return WithoutQloo.parse(result.output);

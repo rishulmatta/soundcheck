@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { Plan } from "@/lib/types";
+import { provenanceFor } from "@/lib/provenance";
+import { DATA_MODE_LABEL } from "@/components/plan/ProvenanceBanner";
 import { Button } from "@/components/ui/Button";
 import { ArrowRight, Link2, Play } from "@/components/ui/icons";
 import type { CardPhase } from "./TourCard";
@@ -38,6 +40,7 @@ export function TourSummary({ plan, phase, onReplay }: { plan: Plan; phase: Card
     timer.current = setTimeout(() => setCopied(false), 1500);
   };
 
+  const { dataMode } = provenanceFor(plan);
   const untapped = plan.stops.filter((s) => s.city.quadrant === "untapped").length;
 
   return (
@@ -50,9 +53,9 @@ export function TourSummary({ plan, phase, onReplay }: { plan: Plan; phase: Card
       <p className="label m-0 mb-1">Tour summary</p>
       <h2 className="disp m-0 mb-3 text-[32px] leading-8">{plan.act.name}</h2>
       <p className="num m-0 mb-1 text-xs leading-5 text-ink">
-        {plan.stops.length} stops · {untapped} untapped {untapped === 1 ? "market" : "markets"} · {plan.summary.qlooCalls} Qloo calls
+        {plan.stops.length} stops · {untapped} markets to investigate
       </p>
-      <p className="m-0 mb-4 text-xs leading-[18px] text-ink-muted">Qloo aggregate affinities. Not predictions about individuals.</p>
+      <p className="m-0 mb-4 text-xs leading-[18px] text-ink-muted">{DATA_MODE_LABEL[dataMode]}. City comparisons are provisional; validate demand, costs and availability.</p>
       <div className="flex flex-wrap gap-2">
         <Button variant="secondary" size="sm" icon={<Play size={14} />} onClick={onReplay}>
           Replay

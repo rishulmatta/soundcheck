@@ -86,7 +86,7 @@ export function QuadrantChart({ candidates, stops = [], activeStop, selected = f
   }, [candidates, activeId, orderById, x, y]);
 
   const svg = (
-    <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="group" aria-label={`Affinity against popularity for ${candidates.length} candidate cities. ${untappedCount} fall in the primed, untapped cell.`}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="group" aria-label={`Affinity against popularity for ${candidates.length} candidate cities. ${untappedCount} have higher affinity with lower popularity. Cross-city comparisons are provisional.`}>
       {/* Highlighted cell ground fades in first. */}
       <rect x={M.left} y={M.top} width={sx - M.left} height={sy - M.top} fill="var(--signal-soft)" className={animate ? "sc-fade" : undefined} />
       <line x1={M.left} y1={H - M.bottom} x2={W - M.right} y2={H - M.bottom} stroke="var(--line-strong)" />
@@ -102,10 +102,10 @@ export function QuadrantChart({ candidates, stops = [], activeStop, selected = f
       ))}
 
       <g fontFamily="var(--font-sans)" fontSize="10" fontWeight="600" letterSpacing="0.08em">
-        <text x={M.left + 8} y={M.top + 16} fill="var(--signal)">PRIMED, UNTAPPED</text>
-        <text x={sx + 8} y={M.top + 16} fill="var(--ink-muted)">ESTABLISHED</text>
-        <text x={M.left + 8} y={H - M.bottom - 8} fill="var(--ink-faint)">REACH</text>
-        <text x={sx + 8} y={H - M.bottom - 8} fill="var(--ink-faint)">REACH</text>
+        <text x={M.left + 8} y={M.top + 16} fill="var(--signal)">INVESTIGATE</text>
+        <text x={sx + 8} y={M.top + 16} fill="var(--ink-muted)">HIGHER SIGNALS</text>
+        <text x={M.left + 8} y={H - M.bottom - 8} fill="var(--ink-faint)">LOWER AFFINITY</text>
+        <text x={sx + 8} y={H - M.bottom - 8} fill="var(--ink-faint)">LOWER AFFINITY</text>
       </g>
       <text x={W - M.right} y={H - 6} textAnchor="end" className="num" fontSize="11" fill="var(--ink-muted)">popularity →</text>
       <text transform={`rotate(-90 12 ${M.top})`} x={12} y={M.top} textAnchor="end" className="num" fontSize="11" fill="var(--ink-muted)">affinity →</text>
@@ -186,11 +186,11 @@ export function QuadrantChart({ candidates, stops = [], activeStop, selected = f
   return (
     <section className={cn("rounded-md border border-line bg-bg-raised p-4 sm:p-5", className)} aria-labelledby="quadrant-title">
       <div className="mb-2 flex items-center gap-2.5">
-        <h2 id="quadrant-title" className="font-display text-[26px] font-semibold leading-7">Primed but untapped</h2>
+        <h2 id="quadrant-title" className="font-display text-[26px] font-semibold leading-7">Markets to investigate</h2>
         <QlooTag />
       </div>
       <p className="mb-3 text-[13px] leading-[18px] text-ink-muted">
-        {candidates.length} candidate cities scored on fan affinity and current popularity. Top left is where fans are but nobody has played.
+        {candidates.length} cities, with provisional affinity and popularity scores. Top left means higher affinity and lower popularity; no booking history is available.
       </p>
       {svg}
     </section>

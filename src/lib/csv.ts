@@ -1,6 +1,7 @@
 /** CSV export of a plan: one row per stop. Pure; RFC 4180 quoting, CRLF line endings. */
 import type { Plan, Stop } from "@/lib/types";
 import { ratesFor, routeEconomics, stopBreakEven, unitsFor, type Leg, type Rates } from "@/lib/economics";
+import { provenanceFor, safePlanForDisplay } from "@/lib/provenance";
 
 export const CSV_COLUMNS = [
   "order",
@@ -28,6 +29,12 @@ export const CSV_COLUMNS = [
   "currency",
   "suggestedCapacity",
   "breakEvenTickets",
+  "dataMode",
+  "heatmapComparability",
+  "demographicsScope",
+  "scoringMethod",
+  "capacityBasis",
+  "ticketsBasis",
 ] as const;
 
 type Cell = string | number | null | undefined;
@@ -88,9 +95,16 @@ function stopRow(stop: Stop, e: Econ): Cell[] {
 
 /** Economics columns use the plan's budget tier at Soundcheck's default rates (the UI lets the user edit them; the CSV does not). */
 export function planToCsv(plan: Plan): string {
+  plan = safePlanForDisplay(plan);
+  const provenance = provenanceFor(plan);
   const units = unitsFor(plan.input.region);
   const rates = ratesFor(plan.input.budgetTier, units);
   const econ: Econ = { ...units, rates, actPopularity: plan.act.popularity, legs: routeEconomics(plan.stops, rates, units.unit).legs };
-  const lines = [CSV_COLUMNS.join(","), ...plan.stops.map((s) => stopRow(s, econ).map(csvCell).join(","))];
+  const notes: Cell[] = [
+    provenance.dataMode, provenance.heatmapComparability, provenance.demographicsScope, provenance.scoringMethod,
+    "Unvalidated room-size planning assumption; not a demand forecast",
+    "Tickets to cover modeled travel and crew costs only; not full show break-even",
+  ];
+  const lines = [CSV_COLUMNS.join(","), ...plan.stops.map((s) => [...stopRow(s, econ), ...notes].map(csvCell).join(","))];
   return lines.join("\r\n") + "\r\n";
 }

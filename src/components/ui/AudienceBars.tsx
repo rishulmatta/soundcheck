@@ -21,15 +21,16 @@ export function AudienceBars({ demographics, play = true, animate = true }: { de
   const { age, gender, status } = demographics;
   // Qloo gives gender as scores against a baseline (roughly -1..1), not shares.
   const diff = gender.female - gender.male;
-  const skew = diff >= 0.04 ? "Skews female" : diff <= -0.04 ? "Skews male" : "Evenly split";
+  const skew = diff >= 0.04 ? "Skews female" : diff <= -0.04 ? "Skews male" : "Similar gender scores";
   const skewValue = `${diff >= 0 ? "+" : "−"}${Math.abs(diff).toFixed(2)}`;
   return (
     <div>
       <div className="label mb-2 flex items-center gap-2">
-        Audience <QlooTag />
+        Overall audience <QlooTag />
       </div>
+      <p className="mb-3 text-xs leading-4 text-ink-muted">Act-wide profile; not specific to this city.</p>
       {age.length === 0 ? (
-        <LimitedData status={status}>Limited Qloo data on audience age in this market.</LimitedData>
+        <LimitedData status={status}>Limited data on the act’s overall audience age.</LimitedData>
       ) : (
         <>
           <div className="grid gap-2">

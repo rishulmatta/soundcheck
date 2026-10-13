@@ -3,10 +3,13 @@
 import dynamic from "next/dynamic";
 import { useCallback, useMemo, useState } from "react";
 import type { Plan } from "@/lib/types";
+import { provenanceFor } from "@/lib/provenance";
+import { DataSourceProvider } from "@/components/ui/QlooTag";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { prefersReducedMotion, useDebounced } from "@/components/ui/motion";
 import { CityCard } from "./CityCard";
 import { PlanHeader } from "./PlanHeader";
+import { ProvenanceBanner } from "./ProvenanceBanner";
 import { ProvenanceFooter } from "./ProvenanceFooter";
 import { QuadrantChart } from "./QuadrantChart";
 import { RevisionBar } from "./RevisionBar";
@@ -58,10 +61,12 @@ export function PlanView({ plan }: { plan: Plan }) {
   };
 
   return (
+    <DataSourceProvider mode={provenanceFor(plan).dataMode}>
     <div className="mx-auto w-full max-w-[1280px] px-4 pb-0 lg:px-12">
       <SiteBar />
       <div className="flex flex-col gap-8">
         <PlanHeader plan={plan} comparing={comparing} onToggleCompare={() => setComparing((c) => !c)} />
+        <ProvenanceBanner plan={plan} />
         {comparing && <WithoutQlooPanel plan={plan} />}
 
         <div className="grid grid-cols-1 gap-4 min-[900px]:grid-cols-12">
@@ -113,15 +118,16 @@ export function PlanView({ plan }: { plan: Plan }) {
           {viewStops.map((s) => {
             const b = econ.breakEven.get(s.order);
             return (
-              <CityCard key={s.city.id} stop={s} pending={{ locked: draft.isLocked(s.city.id), dropped: draft.isDropped(s.city.id) }} onLock={draft.toggleLock} onDrop={draft.toggleDrop} poolSize={pool} selected={sel.selected === s.order} hovered={sel.hovered === s.order} onSelect={sel.toggle} onHover={sel.setHovered} breakEven={b ? { b, units: econ.units, rates: econ.rates } : undefined} />
+              <CityCard key={s.city.id} plan={plan} stop={s} pending={{ locked: draft.isLocked(s.city.id), dropped: draft.isDropped(s.city.id) }} onLock={draft.toggleLock} onDrop={draft.toggleDrop} poolSize={pool} selected={sel.selected === s.order} hovered={sel.hovered === s.order} onSelect={sel.toggle} onHover={sel.setHovered} breakEven={b ? { b, units: econ.units, rates: econ.rates } : undefined} />
             );
           })}
         </section>
 
-        <TraceRail variant="footer" steps={plan.trace} summary={plan.summary} />
+        <TraceRail variant="footer" steps={plan.provenance?.proseVersion === 2 ? plan.trace : plan.trace.map((step) => ({ ...step, summary: "Legacy summary hidden; inspect recorded source calls." }))} summary={plan.summary} />
         <ProvenanceFooter plan={plan} />
       </div>
       <RevisionBar plan={plan} draft={draft} />
     </div>
+    </DataSourceProvider>
   );
 }

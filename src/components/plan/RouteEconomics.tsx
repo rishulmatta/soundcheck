@@ -73,7 +73,7 @@ export function BreakEvenLine({ b, units, rates }: { b: BreakEven; units: Units;
   if (b.tickets === undefined || b.sellThrough === undefined) {
     return (
       <p className="text-[13px] leading-[18px] text-ink-muted">
-        Flight leg in, not priced. The <span className="num text-ink">{formatInt(b.capacity)}</span>-cap room grosses <span className="num text-ink">{money(b.gross, units)}</span> at a <span className="num text-ink">{money(rates.avgTicket, units)}</span> ticket.
+        Flight leg in, not priced. An assumed <span className="num text-ink">{formatInt(b.capacity)}</span>-cap room would gross <span className="num text-ink">{money(b.gross, units)}</span> if sold out at a <span className="num text-ink">{money(rates.avgTicket, units)}</span> ticket.
       </p>
     );
   }
@@ -81,7 +81,7 @@ export function BreakEvenLine({ b, units, rates }: { b: BreakEven; units: Units;
   const tight = b.sellThrough > 0.7;
   return (
     <p className="text-[13px] leading-[18px] text-ink-muted">
-      Break-even <span className={cn("num", tight ? "text-warn" : "text-ink")}>{formatInt(b.tickets)}</span> tickets, <span className={cn("num", tight ? "text-warn" : "text-ink")}>{pct}%</span> of the room, to cover the leg in and one show day at a <span className="num text-ink">{money(rates.avgTicket, units)}</span> ticket.
+      <span className={cn("num", tight ? "text-warn" : "text-ink")}>{formatInt(b.tickets)}</span> tickets to cover modeled travel and crew, <span className={cn("num", tight ? "text-warn" : "text-ink")}>{pct}%</span> of the assumed room, for the leg in and one show day at a <span className="num text-ink">{money(rates.avgTicket, units)}</span> ticket.
       {tight && " Tight."}
     </p>
   );
@@ -212,7 +212,7 @@ export function RouteEconomicsStrip({ stops, state, editable = true, hoveredStop
       )}
 
       <p className="mt-3 max-w-[80ch] text-xs leading-4 text-ink-faint">
-        Soundcheck estimate from the routed distances, not Qloo data. Road {unitLabel} are straight-line × 1.25. Covers moving the tour and keeping the crew on the road. Venue hire, production and the act&rsquo;s fee are not included; flight legs and hotels are not priced because there is no reliable source for them.
+        Planning assumptions, not a full show break-even. Distance and costs are Soundcheck estimates. Road {unitLabel} are straight-line × 1.25. Covers moving the tour and keeping the crew on the road. Venue hire, production and the act&rsquo;s fee are not included; flight legs and hotels are not priced because there is no reliable source for them.
       </p>
     </section>
   );

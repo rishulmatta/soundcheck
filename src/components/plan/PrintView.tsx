@@ -1,9 +1,11 @@
 import type { Plan } from "@/lib/types";
+import { provenanceFor } from "@/lib/provenance";
 import { MarketBadge } from "@/components/ui/MarketBadge";
-import { QlooTag } from "@/components/ui/QlooTag";
+import { DataSourceProvider, QlooTag } from "@/components/ui/QlooTag";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { CityCard } from "./CityCard";
 import { PrintButton, PrintTheme } from "./PrintControls";
+import { ProvenanceBanner } from "./ProvenanceBanner";
 import { ProvenanceFooter } from "./ProvenanceFooter";
 import { QuadrantChart } from "./QuadrantChart";
 import { RouteSketch, projectPlan } from "./RouteSketch";
@@ -11,7 +13,7 @@ import { RouteStrip } from "./RouteStrip";
 import { staticEconomics } from "@/lib/economics";
 import { RouteEconomicsStrip } from "./RouteEconomics";
 import { ACT_TYPE_LABEL, formatDate, planParams } from "./format";
-import { ActLinks, ActPortrait } from "./ActIdentity";
+import { ActLinks, ActPortrait, hasConfirmedQlooMatch } from "./ActIdentity";
 import "./print.css";
 
 const sheet = "print-sheet mx-auto w-full max-w-[820px] border border-line bg-bg-raised p-8 print:max-w-none print:border-0 print:p-0";
@@ -21,11 +23,14 @@ const TREND = { rising: "Rising", flat: "Flat", falling: "Falling", unknown: "Un
 /** The promoter deliverable: cover page, then one city per page. No interactive elements except the print button. */
 export function PrintView({ plan }: { plan: Plan }) {
   const { act, momentum } = plan;
+  const { dataMode } = provenanceFor(plan);
+  const confirmedMatch = hasConfirmedQlooMatch(plan);
   const sketch = projectPlan(plan);
   const untapped = plan.stops.filter((s) => s.city.quadrant === "untapped");
   const pool = plan.candidates.length;
   const econ = staticEconomics(plan);
   return (
+    <DataSourceProvider mode={dataMode}>
     <div className="print-root bg-bg px-4 py-8 print:p-0">
       <PrintTheme />
       <div className="mx-auto mb-6 flex w-full max-w-[820px] items-center justify-between gap-3 print:hidden">
@@ -42,8 +47,8 @@ export function PrintView({ plan }: { plan: Plan }) {
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] leading-[22px]">
             <span>{ACT_TYPE_LABEL[act.type]}{act.subtype ? ` · ${act.subtype}` : ""}</span>
-            <StatusChip status="ok">verified entity</StatusChip>
-            <span className="num text-xs text-ink-muted">Qloo ID {act.id}</span>
+            <StatusChip status={confirmedMatch ? "ok" : "partial"}>{confirmedMatch ? "Qloo match" : dataMode === "mock" ? "synthetic entity" : "identity unverified"}</StatusChip>
+            {act.id && <span className="num text-xs text-ink-muted">{confirmedMatch ? "Qloo ID" : "Stored ID"} {act.id}</span>}
           </div>
           {act.description && <p className="mt-2 max-w-[70ch] text-[15px] leading-[22px]">{act.description}</p>}
           <ActLinks act={act} print className="mt-2" />
@@ -64,17 +69,19 @@ export function PrintView({ plan }: { plan: Plan }) {
             )}
           </p>
 
+          <ProvenanceBanner plan={plan} className="mt-4" />
+
           <div className="mt-6 grid grid-cols-3 gap-4 border-y border-line py-4">
             <div>
               <p className="label">Stops</p>
               <p className="font-display text-[40px] font-bold leading-10">{plan.stops.length}</p>
             </div>
             <div>
-              <p className="label">Untapped markets</p>
+              <p className="label">Investigate</p>
               <p className="font-display text-[40px] font-bold leading-10">{untapped.length}</p>
             </div>
             <div>
-              <p className="label">Qloo calls</p>
+              <p className="label">{dataMode === "mock" ? "Simulated calls" : "Data calls"}</p>
               <p className="num text-[40px] font-medium leading-10">{plan.summary.qlooCalls}</p>
             </div>
           </div>
@@ -85,8 +92,14 @@ export function PrintView({ plan }: { plan: Plan }) {
             </div>
             <QuadrantChart candidates={plan.candidates} stops={plan.stops} animate={false} panel={false} className="rounded-md border border-line bg-bg-raised p-2" />
           </div>
-          <p className="mt-2 text-xs leading-4 text-ink-muted">Left: route and heat by fan affinity. Right: affinity against popularity for {pool} candidate cities; the shaded cell is primed but untapped.</p>
+          <p className="mt-2 text-xs leading-4 text-ink-muted">Left: route and heat by fan affinity. Right: affinity against popularity for {pool} candidate cities; the shaded cell has higher affinity and lower popularity. Rankings are provisional.</p>
 
+          <ProvenanceFooter plan={plan} className="mt-6" />
+        </section>
+
+        <section className={sheet} aria-label="Route and cost assumptions">
+          <h2 className="font-display text-[26px] font-semibold leading-7">Route and cost assumptions</h2>
+          <p className="mt-2 text-[13px] leading-[18px] text-ink-muted">{act.name} · {plan.stops.length} proposed stops. Confirm demand, availability and a complete show budget before booking.</p>
           <RouteStrip stops={plan.stops} animate={false} interactive={false} className="mt-6" />
           <RouteEconomicsStrip stops={plan.stops} region={plan.input.region} state={{ tier: econ.tier, rates: econ.rates, units: econ.units, economics: econ.economics }} editable={false} className="mt-4" />
           <ProvenanceFooter plan={plan} className="mt-6" />
@@ -98,10 +111,10 @@ export function PrintView({ plan }: { plan: Plan }) {
               {act.name} · stop <span className="num">{s.order}</span> of <span className="num">{plan.stops.length}</span>
               {s.legDays > 0 && <> · <span className="num">{s.legDays}</span> travel days from the previous stop</>}
             </p>
-            <CityCard stop={s} poolSize={pool} animate={false} print className="p-6" breakEven={econ.breakEven.get(s.order) ? { b: econ.breakEven.get(s.order)!, units: econ.units, rates: econ.rates } : undefined} />
+            <CityCard plan={plan} stop={s} poolSize={pool} animate={false} print className="p-6" breakEven={econ.breakEven.get(s.order) ? { b: econ.breakEven.get(s.order)!, units: econ.units, rates: econ.rates } : undefined} />
             {s.city.quadrant === "untapped" && (
               <p className="mt-3 flex items-center gap-2 text-[13px] leading-[18px] text-ink-muted">
-                <MarketBadge quadrant="untapped" size="sm" /> High affinity, low popularity. An early-announce market.
+                <MarketBadge quadrant="untapped" size="sm" /> Higher affinity, lower popularity. A market to investigate; booking history is unknown.
               </p>
             )}
             <ProvenanceFooter plan={plan} className="mt-6" />
@@ -111,7 +124,7 @@ export function PrintView({ plan }: { plan: Plan }) {
         <section className={sheet} aria-label="Method">
           <h2 className="font-display text-[26px] font-semibold leading-7">How this plan was made</h2>
           <p className="mt-1 text-[13px] leading-[18px] text-ink-muted">
-            Generated {formatDate(plan.createdAt)}. Every request below is shown with the key and entity IDs redacted.
+            Generated {formatDate(plan.createdAt)}. Representative requests below have keys and entity IDs redacted. The interactive plan has the complete call trace.
             {plan.summary.model && plan.summary.model.calls > 0 && (
               <> Model {plan.summary.model.id}: <span className="num">{plan.summary.model.calls}</span> calls, <span className="num">{plan.summary.model.inputTokens.toLocaleString("en-US")}</span> input tokens (<span className="num">{plan.summary.model.cacheReadTokens.toLocaleString("en-US")}</span> from cache), <span className="num">{plan.summary.model.outputTokens.toLocaleString("en-US")}</span> output tokens.</>
             )}
@@ -123,7 +136,10 @@ export function PrintView({ plan }: { plan: Plan }) {
                   <span className="text-sm font-semibold leading-5">{t.name}</span>
                   <StatusChip status={t.status} size="sm" />
                 </div>
-                <p className="num text-xs leading-4 text-ink-muted">{t.summary}</p>
+                <p className="num text-xs leading-4 text-ink-muted">{plan.provenance?.proseVersion === 2 ? t.summary : "Legacy summary hidden; source calls retained."}</p>
+                {Array.from(new Set(t.calls.flatMap((c) => c.note ? [c.note] : []))).map((note) => (
+                  <p key={note} className="mt-1 text-xs leading-4 text-ink-muted"><span className="font-semibold">Evidence note:</span> {note}</p>
+                ))}
                 {t.calls.slice(0, 1).map((c, i) => (
                   <code key={i} className="num mt-1 block break-all text-[11px] leading-4 text-ink-faint">{c.request}</code>
                 ))}
@@ -134,5 +150,6 @@ export function PrintView({ plan }: { plan: Plan }) {
         </section>
       </div>
     </div>
+    </DataSourceProvider>
   );
 }

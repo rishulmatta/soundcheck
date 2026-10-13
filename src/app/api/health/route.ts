@@ -1,9 +1,11 @@
 import { getKV } from "@/lib/redis";
 import { qlooMode } from "@/lib/qloo";
 import { SEEDED_PLAN_IDS } from "@/lib/store";
+import { connection } from "next/server";
 
 /** Operational health: which storage backend and Qloo mode are active. No secrets. */
 export async function GET() {
+  await connection();
   const kv = getKV();
   let kvStatus: "none" | "ok" | "error" = "none";
   if (kv) {
@@ -25,5 +27,5 @@ export async function GET() {
     redisUrlSet: Boolean(process.env.REDIS_URL),
     qloo: qlooMode(),
     model: Boolean(process.env.ANTHROPIC_API_KEY),
-  });
+  }, { headers: { "Cache-Control": "no-store" } });
 }

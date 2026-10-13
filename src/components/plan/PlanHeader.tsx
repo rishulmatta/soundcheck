@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Plan } from "@/lib/types";
+import { provenanceFor } from "@/lib/provenance";
 import { Button } from "@/components/ui/Button";
 import { QlooTag } from "@/components/ui/QlooTag";
 import { StatusChip } from "@/components/ui/StatusChip";
 import Link from "next/link";
 import { Check, Download, FileText, Link2, Play, Shuffle } from "@/components/ui/icons";
 import { ACT_TYPE_LABEL, planParams } from "./format";
-import { ActLinks, ActPortrait } from "./ActIdentity";
+import { ActLinks, ActPortrait, hasConfirmedQlooMatch } from "./ActIdentity";
 
 const TREND = { rising: "▲ Rising", flat: "▬ Flat", falling: "▼ Falling", unknown: "Momentum unavailable" } as const;
 
@@ -56,6 +57,8 @@ export function ShareButton({ id }: { id: string }) {
 
 export function PlanHeader({ plan, comparing, onToggleCompare }: { plan: Plan; comparing: boolean; onToggleCompare: () => void }) {
   const { act, momentum } = plan;
+  const { dataMode } = provenanceFor(plan);
+  const confirmedMatch = hasConfirmedQlooMatch(plan);
   const subtype = act.subtype ? ` · ${act.subtype}` : "";
   return (
     <header className="flex flex-col gap-6 pb-2 pt-2 lg:flex-row lg:items-end lg:justify-between">
@@ -80,8 +83,8 @@ export function PlanHeader({ plan, comparing, onToggleCompare }: { plan: Plan; c
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[15px] leading-[22px]">
             <span className="text-ink">{ACT_TYPE_LABEL[act.type]}{subtype}</span>
-            <StatusChip status="ok">verified entity</StatusChip>
-            <span className="num text-xs leading-4 text-ink-muted">Qloo ID {act.id}</span>
+            <StatusChip status={confirmedMatch ? "ok" : "partial"}>{confirmedMatch ? "Qloo match" : dataMode === "mock" ? "synthetic entity" : "identity unverified"}</StatusChip>
+            {act.id && <span className="num text-xs leading-4 text-ink-muted">{confirmedMatch ? "Qloo ID" : "Stored ID"} {act.id}</span>}
           </div>
           {act.description && <p className="max-w-[60ch] text-[15px] leading-[22px] text-ink">{act.description}</p>}
           <ActLinks act={act} />
@@ -110,7 +113,7 @@ export function PlanHeader({ plan, comparing, onToggleCompare }: { plan: Plan; c
         <ShareButton id={plan.id} />
         <Button variant="secondary" href={`/plan/${plan.id}/print`} icon={<FileText />}>PDF</Button>
         <Button variant="secondary" href={`/api/plan/${plan.id}/csv`} download icon={<Download />}>CSV</Button>
-        {plan.withoutQloo && (
+        {plan.withoutQloo?.protocolVersion === 2 && (
           <Button variant="secondary" aria-pressed={comparing} onClick={onToggleCompare} icon={<Shuffle />}>
             Without Qloo
           </Button>

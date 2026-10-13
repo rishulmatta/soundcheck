@@ -1,5 +1,7 @@
 # Soundcheck
 
+> Historical research from October 11. Some hypotheses below were corrected during implementation: popularity is not booking history, comparisons are derived taste similarity, demographics are act-wide, and cross-city normalization remains unverified. Current claims and validation status are in README.md and VALIDATION.md.
+
 **Tour intelligence for any live act.**
 Run a soundcheck on your tour before anyone books a venue.
 

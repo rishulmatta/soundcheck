@@ -12,19 +12,19 @@ import { stagger } from "@/components/ui/stagger";
 const STEPS = [
   {
     title: "Name the act",
-    body: "Any musician, comedian or live podcast. Soundcheck finds it in Qloo's taste graph and pulls its audience.",
+    body: "Start with a musician. Soundcheck resolves the artist in Qloo’s taste graph and finds relevant audience signals.",
   },
   {
-    title: "Score every city",
-    body: "Fan affinity against current popularity for each metro in the region. Top left of the quadrant is where the fans are and nobody has played.",
+    title: "Investigate markets",
+    body: "Explore affinity and popularity signals across a regional city pool. Comparisons are provisional; popularity is not performance history.",
   },
   {
     title: "Take the routed plan",
-    body: "Ordered stops with travel days, openers with real fan overlap, sponsors, venues and a one-line why for every city. Share it, print it, or revise it by hand.",
+    body: "Review travel costs, related openers, sponsor ideas and local activations. Lock a city, drop a stop, then export a brief for your team.",
   },
 ];
 
-const PROOF = ["Openers ranked by fan overlap", "Sponsors and activations per stop", "Share link, print to PDF, CSV"];
+const PROOF = ["Openers connected by taste", "Sponsors and activations per stop", "Share link, print to PDF, CSV"];
 
 export default function Home() {
   return (
@@ -48,18 +48,17 @@ export default function Home() {
       <section className="mt-8 grid gap-8 sm:mt-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:gap-10">
         <div className="flex flex-col justify-center gap-6">
           <p className="label flex items-center gap-2">
-            Tour intelligence <span aria-hidden="true">·</span> built on <QlooTag />
+            For independent artist managers <span aria-hidden="true">·</span> <QlooTag mode="live" />
           </p>
           <h1 className="sc-set font-display text-[48px] font-bold uppercase leading-[46px] sm:text-[64px] sm:leading-[60px]">
-            Route the tour to where the fans already are.
+            Find your next tour markets.
           </h1>
           <p className="max-w-[52ch] text-[17px] leading-[26px] text-ink-muted">
-            Soundcheck scores every city in a region on fan affinity against how often the act plays there, finds the markets that are primed but nobody
-            has booked, and routes a tour through them. Openers, sponsors and local activations for every stop, each one explained and sourced.
+            Discover promising markets, assess travel tradeoffs, and find culturally aligned partners. Soundcheck turns audience signals into an editable tour shortlist, with evidence and assumptions alongside each recommendation.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Button href="/plan/demo-musician" variant="primary" icon={<ArrowRight />} className="flex-row-reverse">
-              See a finished plan
+              Explore the musician example
             </Button>
             <Button href="#plan" variant="secondary">
               Plan your own
@@ -108,7 +107,7 @@ export default function Home() {
             <span aria-hidden="true" className="h-px flex-1 bg-line" />
           </div>
           <p className="max-w-[60ch] text-[15px] leading-[22px] text-ink-muted">
-            Three tours already planned. Open one to see the map, the quadrant, every city card and the full agent trace. No waiting.
+            Start with the musician example: inspect a city’s evidence, revise a stop, and export the brief. Each saved plan shows its data source. Comedian and podcast examples are experimental.
           </p>
         </div>
         <DemoCards />
@@ -123,8 +122,7 @@ export default function Home() {
             <span aria-hidden="true" className="h-px flex-1 bg-line" />
           </div>
           <p className="max-w-[60ch] text-[15px] leading-[22px] text-ink-muted">
-            Name the act and pick a region. You watch the agent resolve the act, score the cities, route the tour and explain each pick as it goes. About
-            two minutes.
+            Name an artist and pick a region. Follow the agent as it gathers signals, proposes a route and explains its choices. Runtime varies with data availability.
           </p>
         </div>
         <LandingForm />
@@ -132,9 +130,9 @@ export default function Home() {
 
       <footer className="mt-16 flex flex-col gap-1 border-t border-line pt-4 text-[13px] leading-[18px] text-ink-muted sm:flex-row sm:items-baseline sm:justify-between">
         <p>
-          <span className="text-ink">Data:</span> Qloo aggregate affinities. Not predictions about individuals.
+          <span className="text-ink">Evidence:</span> Plans distinguish Qloo API data, synthetic examples and unverified sources.
         </p>
-        <p>Routing, room sizes and activations are Soundcheck&apos;s interpretation.</p>
+        <p>Shortlists to investigate, with room sizes and costs shown as assumptions.</p>
       </footer>
     </main>
   );

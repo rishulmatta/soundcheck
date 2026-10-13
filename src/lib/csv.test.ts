@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Plan } from "@/lib/types";
 import sample from "@/fixtures/plan.sample.json";
 import { CSV_COLUMNS, csvCell, planToCsv } from "@/lib/csv";
+import { createProvenance } from "@/lib/provenance";
 
 /** Minimal RFC 4180 parser for round-trip checks. */
 function parseCsv(text: string): string[][] {
@@ -64,13 +65,18 @@ describe("planToCsv", () => {
       topAgeBucket: "30_to_34",
       femaleScore: "0.16",
       openers: "Harbor Lights | Dry Pines",
-      suggestion: "1,800-cap hall",
+      dataMode: "unknown",
+      heatmapComparability: "unverified",
+      demographicsScope: "act-wide",
     });
-    expect(first.whyHere).toBe(plan.stops[0].whyHere);
+    expect(first.suggestion).toMatch(/Room-size assumption/);
+    expect(first.whyHere).toContain("Cross-city comparability is unverified");
+    expect(first.ticketsBasis).toContain("not full show break-even");
   });
 
   it("round-trips awkward text", () => {
     const tricky = structuredClone(plan);
+    tricky.provenance = createProvenance("mock");
     tricky.stops = [{ ...plan.stops[0], whyHere: 'Says "primed", then\na newline, and commas' }];
     const rows = parseCsv(planToCsv(tricky));
     expect(rows[1][CSV_COLUMNS.indexOf("whyHere")]).toBe('Says "primed", then\na newline, and commas');

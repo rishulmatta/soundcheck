@@ -14,6 +14,7 @@ import { getPlanOrSeed } from "@/lib/ensureSeed";
 import { resolveCities } from "@/lib/revision";
 import { matchesCity } from "@/lib/routing";
 import { RevisionProposal, type ChangeSet, type CityPoolEntry, type Plan } from "@/lib/types";
+import { admitRun, limitedResponse } from "@/lib/runLimit";
 
 const Body = z.object({ request: z.string().trim().min(1).max(600) });
 const NO_STORE = { "Cache-Control": "no-store" };
@@ -34,6 +35,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   const plan = await getPlanOrSeed(id);
   if (!plan) return Response.json({ error: "Plan not found" }, { status: 404, headers: NO_STORE });
   if (!process.env.ANTHROPIC_API_KEY) return Response.json({ error: "No model configured" }, { status: 503, headers: NO_STORE });
+  const admission = admitRun("proposal");
+  if (!admission.ok) return limitedResponse(admission);
 
   const pool = cityPoolFor(plan.input.region);
   let draft: RevisionDraft;
@@ -42,6 +45,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   } catch (err) {
     console.warn(`[api/plan/${id}/propose] model failed:`, err instanceof Error ? err.message : err);
     return Response.json({ error: "The model could not read that request. Try naming cities from the route." }, { status: 502, headers: NO_STORE });
+  } finally {
+    admission.release();
   }
 
   const proposal = RevisionProposal.parse(proposalFromDraft(draft, plan, pool));

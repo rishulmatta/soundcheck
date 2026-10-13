@@ -54,9 +54,12 @@ export interface RelatedEntity {
   explanation?: string;
 }
 
+/** `overlap` is a compatibility name for a derived taste-similarity index, never measured shared fans. */
 export interface CompareData { overlap: number; sharedTags: string[] }
 
 export interface QlooClient {
+  /** Explicit source identity; injected clients without it remain unknown. */
+  readonly mode?: "mock" | "live";
   /** GET /search */
   searchEntity(query: string, type: ActType): Promise<ToolResult<EntityCandidate[]>>;
   /** GET /v2/tags */

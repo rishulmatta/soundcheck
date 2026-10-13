@@ -48,10 +48,12 @@ export type StepId =
   | "sponsors"
   | "places"
   | "explain"
+  | "comparison"
   | "guard";
 
 /** Human label used when a call throws before the client could produce its own redacted request string. */
-const CALL_LABEL: Record<keyof QlooClient, string> = {
+type QlooMethod = Exclude<keyof QlooClient, "mode">;
+const CALL_LABEL: Record<QlooMethod, string> = {
   searchEntity: "GET /search",
   findTags: "GET /v2/tags",
   heatmapForCity: "GET /v2/insights?filter.type=urn:heatmap",
@@ -116,7 +118,7 @@ export class Tracer {
 
   record(id: StepId, callType: string, meta: ToolMeta, status: ToolStatus) {
     const step = this.find(id) ?? this.begin(id, id);
-    step.calls.push({ request: meta.request, status, ms: Math.round(meta.ms), cached: meta.cached });
+    step.calls.push({ request: meta.request, status, ms: Math.round(meta.ms), cached: meta.cached, note: meta.note });
     this.callTypes.add(callType);
     this.calls += 1;
     const next = this.computeStatus(step);
@@ -259,7 +261,7 @@ export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, i:
 }
 
 /** Calls one Qloo method, records it on the trace, and converts a throw into an "error" envelope. */
-async function q<K extends keyof QlooClient, T>(
+async function q<K extends QlooMethod, T>(
   ctx: RunContext,
   step: StepId,
   type: K,
@@ -483,7 +485,7 @@ export function score(ctx: RunContext): CityScore[] {
   ctx.emit({ type: "candidates", candidates: ctx.state.candidates });
   const untapped = ctx.state.candidates.filter((c) => c.quadrant === "untapped").length;
   const step = ctx.tracer.get("score");
-  ctx.tracer.end("score", `heatmap ×${rows.length}; ${untapped} primed but untapped${step?.status === "degraded" ? "; thin cities re-seeded by taste tags" : ""}`, `Score ${rows.length} cities`);
+  ctx.tracer.end("score", `heatmap ×${rows.length}; ${untapped} provisional higher-affinity/lower-popularity candidates; cross-city comparability unverified${step?.status === "degraded" ? "; thin cities re-seeded by taste tags" : ""}`, `Score ${rows.length} cities`);
   return ctx.state.candidates;
 }
 
@@ -748,7 +750,7 @@ export function createAgentTools(ctx: RunContext, track: <T>(p: Promise<T>) => P
     spec("getMomentum", "Qloo /v2/trending for the act: rising, flat or falling.", z.object({ weeks: z.number().int().min(4).max(26).optional() }), async ({ weeks }) => fetchMomentum(ctx, weeks)),
     spec(
       "getDemographics",
-      "Qloo demographics insights: the act's overall audience age and gender skew (scores vs baseline), plus localized profiles for the given city ids.",
+      "Qloo demographics insights: the act's overall audience age and gender scores vs baseline. These are act-wide, not local audience measurements.",
       z.object({ cityIds: z.array(z.string()).max(20).optional() }),
       async ({ cityIds: ids }) => fetchDemographics(ctx, ids ?? []),
     ),
@@ -772,7 +774,7 @@ export function createAgentTools(ctx: RunContext, track: <T>(p: Promise<T>) => P
     ),
     spec(
       "compareAudiences",
-      "Qloo /v2/analysis/compare between the act and candidate openers: audience overlap 0..1.",
+      "Qloo /v2/analysis/compare between the act and candidate openers. The returned overlap field is Soundcheck's derived taste-similarity index, not a percentage of shared fans.",
       z.object({ candidateIds: z.array(z.string()).min(1).max(8) }),
       async ({ candidateIds }) => compareOpeners(ctx, candidateIds),
     ),

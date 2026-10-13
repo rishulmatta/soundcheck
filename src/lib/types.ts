@@ -154,8 +154,10 @@ export type Demographics = z.infer<typeof Demographics>;
 export const Pick = z.object({
   id: z.string(),
   name: z.string(),
-  /** 0..1 fanbase overlap from /v2/analysis/compare, openers only. */
+  /** Legacy field. Its semantics were not verified; do not present it as audience overlap. */
   overlap: z.number().min(0).max(1).optional(),
+  /** Soundcheck's derived similarity of shared taste scores, not a percentage of shared fans. */
+  tasteSimilarity: z.number().min(0).max(1).optional(),
   /** One line from Qloo explainability, or our summary of it. */
   reason: z.string(),
   tags: z.array(z.string()).default([]),
@@ -205,6 +207,8 @@ export const TraceCall = z.object({
   status: ToolStatus,
   ms: z.number(),
   cached: z.boolean(),
+  /** Source and fallback limitations carried from the tool response. */
+  note: z.string().optional(),
 });
 export const TraceStep = z.object({
   id: z.string(),
@@ -217,6 +221,18 @@ export const TraceStep = z.object({
 });
 export type TraceStep = z.infer<typeof TraceStep>;
 
+export const PlanProvenance = z.object({
+  dataMode: z.enum(["mock", "live", "unknown"]),
+  /** No live API contract/response validation has established cross-city comparability yet. */
+  heatmapComparability: z.literal("unverified"),
+  demographicsScope: z.literal("act-wide"),
+  similarityMethod: z.literal("derived-taste-similarity"),
+  scoringMethod: z.literal("heuristic-v1"),
+  /** Absent on legacy plans whose saved explanatory text needs conservative display fallbacks. */
+  proseVersion: z.literal(2).optional(),
+});
+export type PlanProvenance = z.infer<typeof PlanProvenance>;
+
 export const Plan = z.object({
   id: z.string(),
   createdAt: z.string(),
@@ -226,6 +242,8 @@ export const Plan = z.object({
   revision: z.number().int().min(1).optional(),
   /** One line naming what changed from the parent, e.g. "Dropped Tulsa · Locked Austin". */
   revisionNote: z.string().optional(),
+  /** Omitted by old saves; infer synthetic ids only, never assume an unlabelled plan is live. */
+  provenance: PlanProvenance.optional(),
   input: PlanInput,
   act: Act,
   momentum: Momentum,
@@ -242,12 +260,17 @@ export const Plan = z.object({
     model: ModelUsage.optional(),
   }),
   /** Optional plain-LLM plan for the "Without Qloo" toggle. */
-  withoutQloo: z.object({ cities: z.array(z.string()), openers: z.array(z.string()), note: z.string() }).optional(),
+  withoutQloo: z.object({
+    cities: z.array(z.string()), openers: z.array(z.string()), note: z.string(),
+    /** Present only after a baseline used the matched brief and passed constraint validation. */
+    protocolVersion: z.literal(2).optional(),
+  }).optional(),
 });
 export type Plan = z.infer<typeof Plan>;
 
 /** Events streamed from POST /api/plan while the agent runs. */
 export type PlanEvent =
+  | { type: "provenance"; provenance: PlanProvenance }
   | { type: "step"; step: TraceStep }
   | { type: "act"; act: Act }
   | { type: "candidates"; candidates: CityScore[] }

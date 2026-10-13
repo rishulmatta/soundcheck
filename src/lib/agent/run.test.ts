@@ -3,7 +3,8 @@ import type { QlooClient, RelatedEntity } from "@/lib/qloo/contract";
 import { Plan, PlanInput, type CityPoolEntry, type PlanEvent, type ToolResult, type ToolStatus } from "@/lib/types";
 import type { AgentModel } from "./model";
 import type { AgentToolSpec } from "./tools";
-import { copyUsesOnlyGivenNumbers, leadAngle, numbersIn, runPlan, type RunDeps } from "./run";
+import { copyMeetsEvidenceLimits, copyUsesOnlyGivenNumbers, leadAngle, numbersIn, runPlan, type RunDeps } from "./run";
+import { MockQlooClient } from "@/lib/qloo/mock";
 import { cityPoolFor } from "./pool";
 import { applyChanges, describeChanges, revisionNote } from "@/lib/revision";
 import { legDaysAlong } from "@/lib/routing";
@@ -35,6 +36,7 @@ function stubQloo(opts: StubOptions = {}): QlooClient & { calls: Record<string, 
       explanation: i === 0 ? "Fans also favour shoegaze." : undefined,
     }));
   return {
+    mode: "mock",
     calls,
     async searchEntity(query, type) {
       hit("searchEntity");
@@ -118,10 +120,10 @@ function stubModel(overrides: Partial<AgentModel> = {}): AgentModel {
     id: "stub-model",
     runAgent: async () => ({ steps: 0, toolCalls: 0, text: "" }),
     writeStopCopy: async (facts) => {
-      const f = facts as { city: string; qloo: { affinityMultipleVsPoolMedian: number }; soundcheck: { suggestedCapacity: number; quadrantLabel: string } };
+      const f = facts as { city: string; qloo: { affinity: number }; soundcheck: { suggestedCapacity: number } };
       return {
-        suggestion: `${f.soundcheck.suggestedCapacity}-cap room`,
-        whyHere: `${f.city} is a ${f.soundcheck.quadrantLabel} at ${f.qloo.affinityMultipleVsPoolMedian}x the median Qloo affinity.`,
+        suggestion: `Room-size assumption: ${f.soundcheck.suggestedCapacity} capacity.`,
+        whyHere: `${f.city} has recorded affinity ${f.qloo.affinity}; cross-city comparability is unverified.`,
       };
     },
     planWithoutQloo: async () => ({ cities: ["New York", "Chicago"], openers: ["Some Band"], note: "Big cities." }),
@@ -155,13 +157,14 @@ describe("runPlan without a model (orchestrator only)", () => {
     expect(plan.momentum.trend).toBe("rising");
     for (const stop of plan.stops) {
       expect(stop.openers.length).toBeGreaterThan(0);
-      expect(stop.openers[0].overlap).toBeGreaterThan(0);
-      expect(stop.openers[0].reason).toMatch(/Qloo compare/);
+      expect(stop.openers[0].tasteSimilarity).toBeGreaterThan(0);
+      expect(stop.openers[0].overlap).toBeUndefined();
+      expect(stop.openers[0].reason).toMatch(/Derived taste similarity/);
       expect(stop.sponsors.length).toBeGreaterThan(0);
       expect(stop.places.length).toBeGreaterThan(0);
       expect(stop.demographics.age.length).toBeGreaterThan(0);
-      expect(stop.suggestion).toMatch(/cap room/);
-      expect(stop.whyHere).toMatch(/median Qloo affinity/);
+      expect(stop.suggestion).toMatch(/Room-size assumption/);
+      expect(stop.whyHere).toMatch(/cross-city comparability is unverified/);
     }
     expect(plan.stops[0].legDays).toBe(0);
 
@@ -252,7 +255,7 @@ describe("runPlan with a model", () => {
     expect(plan.stops).toHaveLength(6); // guard re-routed with the requested stop count
     // The model's venue tag choice was kept (the guard did not pick its own).
     expect(qloo.calls.findTags).toBe(1);
-    expect(plan.stops[0].whyHere).toMatch(/median Qloo affinity/);
+    expect(plan.stops[0].whyHere).toMatch(/cross-city comparability is unverified/);
     expect(plan.trace.find((s) => s.id === "explain")?.summary).toMatch(/model for 6\/6 stops/);
   });
 
@@ -298,8 +301,10 @@ describe("runPlan with a model", () => {
     expect(agent?.status).toBe("degraded");
     expect(agent?.summary).toMatch(/Model unavailable \(429 rate limited\)/);
     expect(plan.stops.some((s) => s.whyHere.includes("97%"))).toBe(false);
-    expect(plan.stops.some((s) => s.whyHere.endsWith("is primed."))).toBe(true);
-    expect(plan.withoutQloo?.cities).toEqual(["New York", "Chicago"]);
+    expect(plan.stops.every((s) => s.whyHere.includes("unverified"))).toBe(true);
+    // A two-city baseline does not satisfy this six-stop brief and must not be published as a matched comparison.
+    expect(plan.withoutQloo).toBeUndefined();
+    expect(plan.trace.find((s) => s.id === "comparison")?.summary).toContain("requested 6");
   });
 });
 
@@ -333,7 +338,7 @@ describe("runPlan revisions", () => {
     const dropped = ids[ids.length - 1];
     const locked = ids[0];
     const runAgent = vi.fn(async () => ({ steps: 0, toolCalls: 0, text: "" }));
-    const writeStopCopy = vi.fn(async () => ({ suggestion: "A room that fits", whyHere: "REWRITTEN" }));
+    const writeStopCopy = vi.fn(async () => ({ suggestion: "Room-size assumption needs checking", whyHere: "REWRITTEN; cross-city comparability is unverified" }));
     const c = changes({ drop: [dropped], lock: [locked] });
     const { plan, save, note } = await revise(parent, c, { qloo: stubQloo(), model: stubModel({ runAgent, writeStopCopy }) });
 
@@ -364,7 +369,7 @@ describe("runPlan revisions", () => {
         expect(s.whyHere).toBe(p.stop.whyHere);
         expect(s.suggestion).toBe(p.stop.suggestion);
       } else {
-        expect(s.whyHere).toBe("REWRITTEN");
+        expect(s.whyHere).toBe("REWRITTEN; cross-city comparability is unverified");
       }
       // Picks carried over for cities that stayed on the route.
       if (p) expect(s.openers.map((o) => o.id)).toEqual(p.stop.openers.map((o) => o.id));
@@ -446,7 +451,7 @@ describe("runPlan revisions", () => {
     expect(plan.summary.qlooCalls).toBe(parent.summary.qlooCalls);
     expect(plan.candidates).toEqual(parent.candidates);
 
-    expect(events.map((e) => e.type)).toEqual(["act", "candidates", "momentum", "step", ...order.map(() => "stop"), "done"]);
+    expect(events.map((e) => e.type)).toEqual(["provenance", "act", "candidates", "momentum", "step", ...order.map(() => "stop"), "done"]);
     // The parent is untouched.
     expect(parent.stops.map((s) => s.city.id)).toEqual(ids);
     expect(parent.trace.some((s) => s.id === "revise")).toBe(false);
@@ -469,6 +474,72 @@ describe("number guard", () => {
     const facts = { qloo: { affinity: 0.91, multiple: 1.4 }, soundcheck: { suggestedCapacity: 1200 } } as unknown as Parameters<typeof copyUsesOnlyGivenNumbers>[1];
     expect(copyUsesOnlyGivenNumbers({ suggestion: "1,200-cap room", whyHere: "1.4x affinity, 91% match" }, facts)).toBe(true);
     expect(copyUsesOnlyGivenNumbers({ suggestion: "1,500-cap room", whyHere: "1.4x" }, facts)).toBe(false);
+  });
+});
+
+describe("evidence and source safeguards", () => {
+  it("persists source mode and limitations, emits them before results and preserves mock notes", async () => {
+    const { plan, events } = await run(baseInput, { qloo: new MockQlooClient(), model: null });
+    expect(plan.provenance).toMatchObject({ dataMode: "mock", heatmapComparability: "unverified", demographicsScope: "act-wide", proseVersion: 2 });
+    expect(events[0]).toEqual({ type: "provenance", provenance: plan.provenance });
+    expect(plan.trace.flatMap((step) => step.calls).some((call) => call.note?.includes("mock"))).toBe(true);
+    expect(plan.stops.every((stop) => stop.openers.every((pick) => pick.overlap === undefined))).toBe(true);
+    expect(plan.stops.every((stop) => stop.whyHere.includes("Synthetic example"))).toBe(true);
+  });
+
+  it("does not claim live provenance for an injected client without explicit source identity", async () => {
+    const qloo = { ...stubQloo(), mode: undefined };
+    const { plan } = await run(baseInput, { qloo, model: null });
+    expect(plan.provenance?.dataMode).toBe("unknown");
+  });
+
+  it("rejects unsupported copy even when it uses only allowed numbers", () => {
+    expect(copyMeetsEvidenceLimits({ suggestion: "Room-size assumption: 1200 capacity", whyHere: "80% audience overlap; comparability unverified" })).toBe(false);
+    expect(copyMeetsEvidenceLimits({ suggestion: "1200-cap room", whyHere: "This city is primed" })).toBe(false);
+    expect(copyMeetsEvidenceLimits({ suggestion: "Room-size assumption: 1200 capacity", whyHere: "Affinity 0.8; cross-city comparability unverified" })).toBe(true);
+  });
+
+  it("does not reuse synthetic entity ids and picks after switching a full revision to a live client", async () => {
+    const { plan: parent } = await run(baseInput, { qloo: new MockQlooClient(), model: null });
+    const qloo = { ...stubQloo(), mode: "live" as const };
+    const plan = await runPlan({ ...baseInput, budgetTier: "van" }, () => {}, {
+      baseline: parent,
+      changes: { lock: [], unlock: [], drop: [], restore: [], budgetTier: "van" },
+      deps: { qloo, model: null, save: async () => {} },
+    });
+    expect(qloo.calls.searchEntity).toBe(1);
+    expect(plan.provenance?.dataMode).toBe("live");
+    expect(plan.act.id).toBe("ent-act");
+    expect(plan.stops.flatMap((stop) => stop.openers).every((pick) => !pick.id.startsWith("mock-"))).toBe(true);
+  });
+
+  it("publishes a comparison only after validating its brief and omits it on changed revisions", async () => {
+    const cities = cityPoolFor(baseInput.region).slice(0, baseInput.stops).map((city) => city.name);
+    const compare = vi.fn(async () => ({ cities, openers: [], note: "Unverified leads from general knowledge." }));
+    const { plan: parent } = await run(baseInput, { qloo: stubQloo(), model: stubModel({ planWithoutQloo: compare }), withoutQloo: true });
+    expect(parent.withoutQloo?.protocolVersion).toBe(2);
+    expect(parent.trace.find((step) => step.id === "comparison")?.status).toBe("ok");
+    const changedModel = await runPlan(baseInput, () => {}, {
+      baseline: parent,
+      changes: { lock: [], unlock: [], drop: [], restore: [] },
+      deps: { qloo: stubQloo(), model: stubModel({ id: "different-model", planWithoutQloo: compare }), withoutQloo: true, save: async () => {} },
+    });
+    expect(changedModel.withoutQloo).toBeUndefined();
+    expect(changedModel.trace.find((step) => step.id === "comparison")?.summary).toContain("model identity differs");
+    const revised = await runPlan({ ...baseInput, stops: 5 }, () => {}, {
+      baseline: parent,
+      changes: { lock: [], unlock: [], drop: [], restore: [], stops: 5 },
+      deps: { qloo: stubQloo(), model: stubModel({ planWithoutQloo: compare }), withoutQloo: true, save: async () => {} },
+    });
+    expect(compare).toHaveBeenCalledTimes(1);
+    expect(revised.withoutQloo).toBeUndefined();
+    expect(revised.trace.find((step) => step.id === "comparison")?.summary).toContain("planning brief changed");
+  });
+
+  it("records a failed comparison without publishing an unchecked baseline", async () => {
+    const { plan } = await run(baseInput, { qloo: stubQloo(), model: stubModel({ planWithoutQloo: async () => { throw new Error("invalid output"); } }), withoutQloo: true });
+    expect(plan.withoutQloo).toBeUndefined();
+    expect(plan.trace.find((step) => step.id === "comparison")).toMatchObject({ status: "degraded", summary: "Comparison omitted: baseline generation or output validation failed" });
   });
 });
 

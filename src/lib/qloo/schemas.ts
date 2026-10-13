@@ -291,16 +291,16 @@ export function explanationText(
   if (raw === undefined) return undefined;
   const contribs = explainabilityContributions(raw).sort((a, b) => b.score - a.score);
   const affinity = e.query?.affinity ?? e.affinity;
-  const where = ctx.place ? ` in ${ctx.place}` : "";
+  const where = ctx.place ? `; requested location signal: ${ctx.place}` : "";
   const aff = affinity !== undefined ? `, affinity ${affinity.toFixed(2)}` : "";
   if (contribs.length === 0) {
-    return affinity !== undefined ? `Qloo ranks this${where} on the act's audience${aff}.` : undefined;
+    return affinity !== undefined ? `Recorded affinity ${affinity.toFixed(2)}${where}; local presence and availability are unverified.` : undefined;
   }
   const top = contribs[0];
   const label = ctx.actIds.includes(top.id)
-    ? "the act's audience"
+    ? "the act signal"
     : (ctx.tagNames?.[top.id] ?? (top.id.startsWith("urn:") ? humanizeUrn(top.id) : "a related signal"));
-  return `Driven by ${label}${where} (influence ${Math.round(clamp01(top.score) * 100)}%${aff}).`;
+  return `Recorded contribution from ${label} (score ${clamp01(top.score).toFixed(2)}${aff})${where}.`;
 }
 
 export function toRelatedEntity(
@@ -454,23 +454,21 @@ export function toTrending(body: unknown): TrendingData | undefined {
 }
 
 /**
- * Overlap from /v2/analysis/compare. For each result item we look for an a-side and b-side affinity
- * (query.a.affinity / query.b.affinity, a.affinity / b.affinity, or affinity_a / affinity_b). Overlap is the mean of
+ * Derived taste similarity from /v2/analysis/compare. For each result item we look for an a-side and b-side affinity
+ * (query.a.affinity / query.b.affinity, a.affinity / b.affinity, or affinity_a / affinity_b). Similarity is the mean of
  * min(a,b)/max(a,b) over the top 10 items ranked by min(a,b): 1 means the two audiences weight shared tastes equally.
- * If the body carries an explicit overlap/similarity number we use that instead. Returns `scored: false` when no
- * per-side scores exist, so the caller can mark the result degraded rather than invent a number.
+ * This is Soundcheck's heuristic, not measured fanbase overlap. Unverified top-level overlap/similarity/score fields
+ * are not used: their semantics have not been validated. Returns `scored: false` when no per-side scores exist.
  */
 export function toCompare(body: unknown): { data: CompareData; items: number; scored: boolean } | undefined {
   const r = CompareResponse.safeParse(body);
   if (!r.success) return undefined;
   const results = r.data.results;
   let items: unknown[] = [];
-  let explicit: number | undefined;
   if (Array.isArray(results)) items = results;
   else if (results && typeof results === "object") {
     const obj = results as Record<string, unknown>;
     for (const k of ["tags", "entities", "results"]) if (Array.isArray(obj[k])) items = items.concat(obj[k] as unknown[]);
-    explicit = [obj.overlap, obj.similarity, obj.score].find((v): v is number => typeof v === "number");
   }
   const scoredItems: { name: string; a: number; b: number }[] = [];
   const names: string[] = [];
@@ -493,10 +491,7 @@ export function toCompare(body: unknown): { data: CompareData; items: number; sc
     const b = side("b");
     if (a !== undefined && b !== undefined) scoredItems.push({ name, a, b });
   }
-  if (items.length === 0 && explicit === undefined) return { data: { overlap: 0, sharedTags: [] }, items: 0, scored: false };
-  if (explicit !== undefined) {
-    return { data: { overlap: round(clamp01(explicit)), sharedTags: names.slice(0, 5) }, items: items.length, scored: true };
-  }
+  if (items.length === 0) return { data: { overlap: 0, sharedTags: [] }, items: 0, scored: false };
   if (scoredItems.length === 0) {
     return { data: { overlap: 0, sharedTags: names.slice(0, 5) }, items: items.length, scored: false };
   }

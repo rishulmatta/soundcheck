@@ -48,7 +48,7 @@ export function MiniQuadrant({ candidates, currentId, className }: { candidates:
       <line x1={splitX} y1={PAD.t} x2={splitX} y2={H - PAD.b} stroke="var(--line)" strokeDasharray="3 3" />
       <line x1={PAD.l} y1={splitY} x2={W - PAD.r} y2={splitY} stroke="var(--line)" strokeDasharray="3 3" />
       <text x={PAD.l + 4} y={PAD.t + 11} fill="var(--signal)" fontSize="8" fontWeight="600" letterSpacing="0.08em">
-        PRIMED, UNTAPPED
+        INVESTIGATE · PROVISIONAL
       </text>
       <text x={W - PAD.r} y={H - 4} textAnchor="end" fill="var(--ink-muted)" fontSize="9" style={{ fontFamily: "var(--font-plex-mono), ui-monospace, monospace" }}>
         popularity →

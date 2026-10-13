@@ -1,5 +1,17 @@
-import type { Act } from "@/lib/types";
+import type { Act, Plan } from "@/lib/types";
+import { provenanceFor } from "@/lib/provenance";
 import { cn } from "@/components/ui/cn";
+
+/** Live configuration alone does not establish that an entity was resolved. */
+export function hasConfirmedQlooMatch(plan: Plan): boolean {
+  const id = plan.act.id;
+  return provenanceFor(plan).dataMode === "live"
+    && id.length > 0
+    && !/\s/.test(id)
+    && !id.toLowerCase().startsWith("mock-")
+    && plan.trace.some((step) => step.id === "resolve" && step.status === "ok"
+      && step.calls.some((call) => call.status === "ok" && /\bGET \/search(?:\?|$)/.test(call.request)));
+}
 
 /**
  * The act's picture, one-line description and confirmation links, fetched online when the plan ran.

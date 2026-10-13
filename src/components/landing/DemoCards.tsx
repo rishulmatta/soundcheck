@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
 import type { ActType } from "@/lib/types";
+import { provenanceFor } from "@/lib/provenance";
 import { SEEDED_PLAN_IDS, getPlan } from "@/lib/store";
 import { seedById } from "@/lib/seeds";
 import { DemoCard, DemoCardSkeleton, type DemoCardData } from "@/components/plan/DemoCard";
@@ -33,14 +34,15 @@ async function LiveDemoCard({ id, index }: { id: (typeof SEEDED_PLAN_IDS)[number
   const untapped = plan?.stops.filter((s) => s.city.quadrant === "untapped").map((s) => s.city.name) ?? [];
   const strongest = plan ? [...plan.stops].sort((a, b) => b.city.affinity - a.city.affinity)[0]?.city.name : undefined;
   const highlight = untapped.length
-    ? { label: "Primed, untapped", text: untapped.slice(0, 3).join(", ") }
+    ? { label: "Investigate", text: untapped.slice(0, 3).join(", ") }
     : strongest
-      ? { label: "Strongest market", text: strongest }
+      ? { label: "Highest provisional affinity", text: strongest }
       : undefined;
 
   const demo: DemoCardData = {
     id,
-    kind: KIND[input.actType] ?? "Act",
+    kind: `${KIND[input.actType] ?? "Act"}${input.actType === "artist" ? " · featured example" : " · experimental"}`,
+    dataMode: plan ? provenanceFor(plan).dataMode : "unknown",
     name: plan?.act.name ?? input.actQuery,
     region: REGION_LABEL[input.region],
     stops: plan?.stops.length ?? input.stops,

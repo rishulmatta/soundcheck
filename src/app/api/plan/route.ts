@@ -11,6 +11,7 @@ import { runPlan, type RunOptions } from "@/lib/agent/run";
 import { cityPoolFor } from "@/lib/agent/pool";
 import { getPlanOrSeed } from "@/lib/ensureSeed";
 import { applyChanges, describeChanges, revisionNote } from "@/lib/revision";
+import { admitRun, limitedResponse } from "@/lib/runLimit";
 
 export const maxDuration = 300;
 
@@ -46,9 +47,13 @@ export async function POST(request: Request) {
     input = parsed.data;
   }
 
+  const admission = admitRun("plan");
+  if (!admission.ok) return limitedResponse(admission);
   const encoder = new TextEncoder();
   const abort = new AbortController();
-  request.signal.addEventListener("abort", () => abort.abort(), { once: true });
+  const onAbort = () => abort.abort();
+  request.signal.addEventListener("abort", onAbort, { once: true });
+  if (request.signal.aborted) abort.abort();
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -67,6 +72,8 @@ export async function POST(request: Request) {
         console.error("[api/plan] run failed:", err);
         send({ type: "error", message: abort.signal.aborted ? "Run cancelled" : "The plan could not be completed. Please try again." });
       } finally {
+        admission.release();
+        request.signal.removeEventListener("abort", onAbort);
         open = false;
         try {
           controller.close();

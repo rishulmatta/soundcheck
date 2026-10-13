@@ -79,7 +79,7 @@ export const QLOO_CALL_TYPES = [
     id: "insights.demographics",
     request: "GET /v2/insights?filter.type=urn:demographics",
     method: "demographics",
-    description: "Profile the act's audience by age bucket and gender, as affinity vs. baseline, to size rooms and pricing.",
+    description: "Profile the act's overall audience by age bucket and gender, as scores vs. baseline; not a city-specific profile or demand forecast.",
     features: ["signal.interests.entities", "signal.interests.tags (fallback)"],
   },
   {
@@ -93,21 +93,21 @@ export const QLOO_CALL_TYPES = [
     id: "insights.same-type",
     request: "GET /v2/insights?filter.type=urn:entity:{artist|person|podcast}",
     method: "relatedActs",
-    description: "Find openers and support acts of the same type whose fans overlap the act's, localized to a city.",
+    description: "Find related acts of the same type with city signals; local connection, availability and suitability need verification.",
     features: ["signal.location.query", "filter.exclude.entities", "feature.explainability", "take"],
   },
   {
     id: "analysis.compare",
     request: "GET /v2/analysis/compare",
     method: "compareAudiences",
-    description: "Quantify fanbase overlap between the act and a candidate opener.",
+    description: "Compare shared taste scores for the act and candidate opener; Soundcheck derives a similarity index, not a percentage of shared fans.",
     features: ["a.signal.interests.entities", "b.signal.interests.entities"],
   },
   {
     id: "insights.brand",
     request: "GET /v2/insights?filter.type=urn:entity:brand",
     method: "brands",
-    description: "Shortlist sponsor brands whose audiences over-index with the act's fans, optionally biased by age buckets.",
+    description: "Shortlist brands using act-wide taste and age signals; sponsorship interest is unverified.",
     features: ["signal.demographics.age", "feature.explainability"],
   },
   {

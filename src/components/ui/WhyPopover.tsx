@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { QlooTag } from "./QlooTag";
 import { cn } from "./cn";
 import "./motion.css";
 
@@ -55,8 +54,9 @@ export function WhyPopover({ title, reason, tags = [], className }: { title: str
           className="sc-popover absolute right-0 top-full z-30 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-md border border-line-strong bg-bg-raised p-3 text-left shadow-popover"
         >
           <p className="label mb-1 flex items-center gap-2">
-            Why {title} <QlooTag />
+            Soundcheck explanation
           </p>
+          <p className="mb-1 text-xs text-ink-muted">{title}</p>
           <p className="text-[13px] leading-[18px] text-ink">{reason}</p>
           {tags.length > 0 && <p className="mt-2 text-xs leading-4 text-ink-muted">{tags.join(" · ")}</p>}
         </div>

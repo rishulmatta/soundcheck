@@ -3,10 +3,12 @@ import { ArrowRight } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { stagger } from "@/components/ui/stagger";
 import { RouteSketch, type SketchPoint } from "./RouteSketch";
+import { DATA_MODE_LABEL } from "./ProvenanceBanner";
 
 export interface DemoCardData {
   id: string;
   kind: string;
+  dataMode: "mock" | "live" | "unknown";
   name: string;
   region: string;
   stops: number;
@@ -35,6 +37,7 @@ export function DemoCard({ demo, index }: { demo: DemoCardData; index: number })
         </div>
         <div className="flex flex-1 flex-col gap-1">
           <p className="label">{demo.kind}</p>
+          <p className="text-xs font-semibold leading-4 text-warn">{DATA_MODE_LABEL[demo.dataMode]}</p>
           <h3 className="font-display text-[32px] font-bold uppercase leading-9 tracking-[0.01em]">{demo.name}</h3>
           <p className="text-[15px] leading-[22px] text-ink-muted">
             {demo.region} · {demo.stops} stops · {demo.window}

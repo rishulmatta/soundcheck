@@ -10,6 +10,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Plan } from "@/lib/types";
+import { provenanceFor } from "@/lib/provenance";
+import { DataSourceProvider } from "@/components/ui/QlooTag";
+import { DATA_MODE_LABEL } from "@/components/plan/ProvenanceBanner";
 import type { TourStatus } from "@/lib/tour/sequencer";
 import { INITIAL_VIEW, TourDirector, type MapSlot, type ViewState } from "./director";
 import { MiniQuadrant } from "./MiniQuadrant";
@@ -28,6 +31,7 @@ export function TourView({ plan }: { plan: Plan }) {
   const router = useRouter();
   const reducedMotion = useReducedMotion();
   const stopCount = plan.stops.length;
+  const { dataMode } = provenanceFor(plan);
 
   const [mapSlot] = useState<MapSlot>(() => ({ current: null }));
   const [view, setView] = useState<ViewState>(INITIAL_VIEW);
@@ -81,6 +85,7 @@ export function TourView({ plan }: { plan: Plan }) {
   const playing = status === "playing";
 
   return (
+    <DataSourceProvider mode={dataMode}>
     <main className="fixed inset-0 overflow-hidden bg-bg-sunken text-ink">
       <div className="absolute inset-0">
         <PlanMap
@@ -96,6 +101,7 @@ export function TourView({ plan }: { plan: Plan }) {
 
       {/* Top-left: act and where we are. */}
       <header className="pointer-events-none absolute left-4 top-4 flex max-w-[60%] flex-col gap-1 sm:left-6 sm:top-6">
+        <p className="m-0 rounded-sm bg-bg-raised/95 px-2 py-1 text-xs font-semibold text-ink">{DATA_MODE_LABEL[dataMode]} · provisional markets</p>
         <p className="m-0 font-display text-[26px] font-semibold leading-7">{plan.act.name}</p>
         <div key={view.finale ? "finale" : view.index} className="tour-fade flex flex-col">
           <p className="label m-0">{view.finale ? "Finale" : `Stop ${view.index + 1} of ${stopCount}`}</p>
@@ -129,7 +135,7 @@ export function TourView({ plan }: { plan: Plan }) {
           {view.finale ? (
             <TourSummary plan={plan} phase={view.cardPhase} onReplay={() => director.replay()} />
           ) : (
-            cardStop && <TourCard stop={cardStop} pool={plan.candidates.length} phase={view.cardPhase} reducedMotion={reducedMotion} />
+            cardStop && <TourCard plan={plan} stop={cardStop} pool={plan.candidates.length} phase={view.cardPhase} reducedMotion={reducedMotion} />
           )}
         </div>
         <div className="pointer-events-none flex w-full justify-center lg:absolute lg:bottom-0 lg:left-1/2 lg:w-auto lg:-translate-x-1/2">
@@ -150,5 +156,6 @@ export function TourView({ plan }: { plan: Plan }) {
         {view.finale ? "Tour finished. Full route shown." : `Stop ${view.index + 1} of ${stopCount}: ${current?.city.name}`}
       </p>
     </main>
+    </DataSourceProvider>
   );
 }

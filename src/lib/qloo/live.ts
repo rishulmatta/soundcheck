@@ -290,6 +290,7 @@ export interface LadderOutcome<T> {
 }
 
 export class LiveQlooClient implements QlooClient {
+  readonly mode = "live" as const;
   readonly http: QlooHttpClient;
   private readonly now: () => Date;
 
@@ -337,6 +338,7 @@ export class LiveQlooClient implements QlooClient {
         return { result: envelope("error", emptyData, res.request, started, allCached, notes) };
       }
       if (parsed.count === 0) {
+        if (parsed.note) notes.push(parsed.note);
         notes.push(`${res.request} returned no results`);
         continue;
       }
@@ -401,7 +403,8 @@ export class LiveQlooClient implements QlooClient {
           const matches = localityMatchesCountry(city, parsed.locality?.disambiguation);
           const notes: string[] = [];
           if (parsed.locality?.disambiguation) notes.push(`locality: ${parsed.locality.disambiguation}`);
-          if (parsed.normalizedWithinCity) notes.push("cell affinity looks normalized within the city; compare cities with care");
+          notes.push("Cross-city heatmap comparability is unverified; market ranks and categories are provisional heuristics");
+          if (parsed.normalizedWithinCity) notes.push("cell affinity looks normalized within the city");
           return {
             data: parsed.heatmap,
             count: parsed.heatmap.cells.length,
@@ -515,9 +518,13 @@ export class LiveQlooClient implements QlooClient {
         const parsed = toCompare(body);
         if (!parsed) return undefined;
         if (!parsed.scored && parsed.items > 0) {
-          return { data: parsed.data, count: parsed.items, status: "degraded", note: "compare returned items without per-side scores; overlap not computed" };
+          return { data: parsed.data, count: parsed.items, status: "degraded", note: "compare returned no usable per-side taste scores; derived taste similarity not computed" };
         }
-        return { data: parsed.data, count: parsed.scored ? Math.max(1, parsed.items) : 0 };
+        return {
+          data: parsed.data,
+          count: parsed.scored ? Math.max(1, parsed.items) : 0,
+          note: parsed.scored ? "Soundcheck derived taste similarity from per-side scores; not measured shared-fan overlap" : "No usable per-side scores for derived taste similarity",
+        };
       },
       emptyData,
       { actIds: [aEntityId] },

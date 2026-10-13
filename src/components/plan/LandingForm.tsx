@@ -44,7 +44,7 @@ export function LandingForm() {
   const [actQuery, setActQuery] = useState("");
   const [actType, setActType] = useState<string>("artist");
   const [region, setRegion] = useState<string>("north-america");
-  const [stops, setStops] = useState("10");
+  const [stops, setStops] = useState("6");
   const [window_, setWindow] = useState("Jan–Mar 2027");
   const [locked, setLocked] = useState("");
   const [excluded, setExcluded] = useState("");
@@ -83,12 +83,12 @@ export function LandingForm() {
     <form onSubmit={submit} noValidate className="flex flex-col gap-5 rounded-md border border-line bg-bg-raised p-5 sm:p-6">
       <div className="grid gap-5 md:grid-cols-[1fr_260px]">
         <Field label="Act" htmlFor={id("act")}>
-          <input id={id("act")} className={fieldCls} value={actQuery} onChange={(e) => setActQuery(e.target.value)} placeholder="Search any artist, comedian, podcast…" autoComplete="off" aria-invalid={error ? true : undefined} />
+          <input id={id("act")} className={fieldCls} value={actQuery} onChange={(e) => setActQuery(e.target.value)} placeholder="Name a musician or band…" autoComplete="off" aria-invalid={error ? true : undefined} />
         </Field>
-        <Field label="Type" htmlFor={id("type")}>
+        <Field label="Type" htmlFor={id("type")} hint="Musicians are the focus. Other live-act types are experimental.">
           <Select id={id("type")} value={actType} onChange={setActType}>
             {ActType.options.map((o) => (
-              <option key={o} value={o}>{ACT_TYPE_OPTION[o]}</option>
+              <option key={o} value={o} disabled={["book", "video_game", "brand"].includes(o)}>{ACT_TYPE_OPTION[o]}{o === "artist" ? "" : ["person", "podcast"].includes(o) ? " · experimental" : " · coming later"}</option>
             ))}
           </Select>
         </Field>

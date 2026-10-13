@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, type CSSProperties } from "react";
-import type { Stop } from "@/lib/types";
+import type { Plan, Stop } from "@/lib/types";
+import { safeStopCopy } from "@/lib/provenance";
 import { easeOut } from "@/lib/tour/ease";
 import { MarketBadge } from "@/components/ui/MarketBadge";
 import { QlooTag } from "@/components/ui/QlooTag";
@@ -19,8 +20,9 @@ const rowStyle = (i: number) => ({ "--i": i }) as CSSProperties;
  * from the sequencer (card in at 1600 ms, bar and rows at 2200 ms) and tour.css does the moving.
  * The only JS motion is the affinity count-up, written straight to the DOM so no React render happens per frame.
  */
-export function TourCard({ stop, pool, phase, reducedMotion }: { stop: Stop; pool: number; phase: CardPhase; reducedMotion: boolean }) {
+export function TourCard({ plan, stop, pool, phase, reducedMotion }: { plan: Plan; stop: Stop; pool: number; phase: CardPhase; reducedMotion: boolean }) {
   const { city } = stop;
+  const copy = safeStopCopy(plan, stop);
   const valueRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
@@ -72,10 +74,11 @@ export function TourCard({ stop, pool, phase, reducedMotion }: { stop: Stop; poo
           0.00
         </span>
         <span className="num whitespace-nowrap text-[11px] text-ink-muted">
-          rank {city.affinityRank}/{pool} · pop {city.popularity.toFixed(2)}
+          provisional {city.affinityRank}/{pool} · pop {city.popularity.toFixed(2)}
         </span>
       </div>
 
+      {bucket && <p className="mb-1 text-[11px] text-ink-muted">Overall audience · act-wide, not city-specific</p>}
       {bucket && (
         <div className="mb-2.5 grid grid-cols-[48px_1fr_auto_auto] items-center gap-2">
           <span className="num text-xs text-ink-muted">{bucket.label}</span>
@@ -96,7 +99,7 @@ export function TourCard({ stop, pool, phase, reducedMotion }: { stop: Stop; poo
             <span className="label w-14 shrink-0">Opener</span>
             <span>
               {opener.name}
-              {opener.overlap !== undefined && <span className="num ml-2 text-xs text-ink-muted">overlap {Math.round(opener.overlap * 100)}%</span>}
+              {opener.tasteSimilarity !== undefined && <span className="num ml-2 text-xs text-ink-muted">derived taste similarity {opener.tasteSimilarity.toFixed(2)}</span>}
             </span>
           </div>
         )}
@@ -107,7 +110,7 @@ export function TourCard({ stop, pool, phase, reducedMotion }: { stop: Stop; poo
           </div>
         )}
         <p className="tc-row m-0 mt-1 border-t border-line pt-2 text-[13px] leading-[18px]" style={rowStyle(row++)}>
-          {splitFigures(stop.whyHere).map((part, i) =>
+          {splitFigures(copy.whyHere).map((part, i) =>
             part.figure ? (
               <span key={i} className="num">
                 {part.text}

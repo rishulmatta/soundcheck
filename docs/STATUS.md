@@ -6,7 +6,19 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
 **Deadline:** Oct 30, 2026, 11:45 pm ET. Submit by Oct 29.
 
 ## Last updated
-2026-10-13 (session 3)
+2026-10-13 (session 4)
+
+## Session 4: evidence and submission readiness
+
+- Explicit persisted and streamed provenance distinguishes synthetic, live API mode, and unknown legacy data. Source notes survive traces and CSV. Old plan copy is sanitized without rewriting saved originals.
+- Removed claims about unplayed/unbooked markets, measured shared-fan percentages, localized demographics and full show break-even. Geographic comparisons remain explicitly unverified; room sizes and travel/crew figures are assumptions.
+- Live identity badges require successful resolution evidence. Failed API calls do not imply confirmed data. Revisions cannot mix mock IDs and live evidence.
+- Optional comparison now matches the brief and city constraints, rejects invalid outputs, and hides old, stale or different-model comparisons. It remains opt-in and is clearly described as illustrative, not a controlled quality benchmark.
+- Homepage focuses on musician research with six-stop default; experimental categories are marked. Source labels appear on plans, tours, replay, print and exports. Print route/economics has a dedicated sheet.
+- Custom plan/proposal endpoints have process-local concurrency and rolling-start limits. Health reads runtime configuration rather than build-time values.
+- Public README rewritten; `docs/DEMO.md` supplies the walkthrough/submission draft; `docs/VALIDATION.md` supplies live-data gates and user-evaluation forms. No outreach, user benefit, or live validation is claimed.
+- Verification: final 185 tests, typecheck, lint, production build and diff checks passed. Desktop and 390px phone layout checked; isolated synthetic six-stop run, revision to five stops, parent preservation and CSV provenance passed with zero model calls. Print preview carries provenance and a separate route/economics sheet.
+- Qloo key remains absent locally. Keep live validation and saved-example regeneration pending. User requested push to origin and deployment; repository is linked to Railway, and requested Vercel URL is being clarified.
 
 ## Done
 - [x] Research handoff written (`docs/RESEARCH.md`)
@@ -26,7 +38,7 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
 
 ## Pending: admin (do these first, they take days to clear)
 - [x] Requested Qloo hackathon API key on 2026-10-12 (expected within a day or two). Build runs with QLOO_MOCK=1 until it lands.
-- [ ] Join hackathon on Devpost: https://qloo.devpost.com/
+- [x] Join hackathon on Devpost: supplied overview PDF dated 2026-10-13 confirms registration.
 - [ ] Join Qloo Discord `#api-help`: https://discord.gg/rF9PKsD5Q7
 - [ ] Escalate in `#api-help` if the key has not arrived by Oct 16
 
@@ -63,26 +75,26 @@ Findings from building the Qloo layer against the live docs on 2026-10-12. Each 
 - [ ] On key arrival: swap mocks for live, test comedian + podcast + author coverage, note findings here
 
 ## Pending: week 2 depth and breadth (Oct 20 to 25)
-- [ ] Openers with `/v2/analysis/compare` overlap
-- [ ] Sponsors (brand insights with demographic signals)
-- [ ] Activations (`/v2/tags` + place insights)
-- [ ] Explainability popovers per pick
-- [ ] Comedian and podcast seeded demos
-- [ ] Thin-data fallbacks (tag-seeded) and "Limited Qloo data" UI state
-- [ ] Print view + CSV export
+- [x] Opener comparison implemented as derived taste similarity; live semantics pending.
+- [x] Sponsors (brand insights with act-wide demographic signals); live validation pending.
+- [x] Activations (`/v2/tags` + place insights); live validation pending.
+- [x] Explanation popovers per pick, with safe legacy wording.
+- [x] Comedian and podcast synthetic seeded demos; live coverage pending.
+- [x] Thin-data fallbacks and limited-data states.
+- [x] Print view + CSV export, with source provenance.
 - [ ] Pre-run and cache the 3 seeded demos
 - [ ] Record the map tour as the Devpost hero GIF and a short video
 
 ## Pending: week 3 polish and write-up (Oct 26 to 30)
 - [ ] Mobile pass, degraded states, rate-limit protection
-- [ ] "Without Qloo" side-by-side toggle (stretch)
+- [x] Optional matched-brief comparison, validation and honest limitations; real evaluation pending.
 - [ ] Move RESEARCH.md sections 6, 7, 10, 11 to `docs/strategy.md` (gitignored); write the public root README.md per kit submission guide
 - [ ] Flip repo public: `gh repo edit --visibility public`; confirm LICENSE shows in About
 - [ ] Devpost description (4 sections matching 4 criteria), screenshots, limitations
 - [ ] Submit Oct 29
 
 ## Blockers
-- Qloo API key not yet requested/received. Build mock-first.
+- Qloo API key requested October 12 but not yet present locally. Live semantics and user evidence remain unvalidated.
 
 ## Decisions made (do not re-litigate)
 - REST API called directly from our backend, not the `qloo mcp` stdio server (see README section 4)
@@ -111,8 +123,8 @@ Findings from building the Qloo layer against the live docs on 2026-10-12. Each 
 - KV choice: Upstash Redis (Marketplace) vs Vercel KV. Pick whichever provisions fastest.
 
 ## Next session starts here
-1. `pnpm install && QLOO_MOCK=1 pnpm dlx tsx scripts/seed.ts && QLOO_MOCK=1 pnpm dev`, open /plan/demo-musician and /plan/demo-musician/tour to see the current state.
-2. If the Qloo key has arrived: run the key-day checklist above first.
+1. Read the session 4 entry and `docs/VALIDATION.md`. Do not rebuild already-implemented features from historical unchecked lists.
+2. If the Qloo key has arrived: run the live-data gate and key-day checklist first. Otherwise keep synthetic labels and do not claim geographic validation.
 3. Ask the user to try the revision controls in a browser (drag a stop, Drop and Lock a card, type a request into the revise bar, Re-run) and fix whatever they report. Open questions: should Drop shrink the tour instead of replacing the city; should a city-set change keep the hand order as a backbone rather than discarding it.
 4. Week 1 list: act autocomplete, the small UI issues above. Copy quality: "1x the pool's median" reads oddly for reach cities; consider rounding language or a different lead for the reach quadrant.
 5. Update this file before ending the session.

@@ -6,7 +6,7 @@ const tone: Record<Quadrant, string> = {
   established: "text-ink-muted",
   reach: "text-ink-faint",
 };
-const label: Record<Quadrant, string> = { untapped: "Untapped", established: "Established", reach: "Reach" };
+const label: Record<Quadrant, string> = { untapped: "Investigate", established: "Higher signals", reach: "Lower affinity" };
 
 export function MarketBadge({ quadrant, size = "md", className }: { quadrant: Quadrant; size?: "md" | "sm"; className?: string }) {
   return (

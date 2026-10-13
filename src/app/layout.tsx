@@ -8,7 +8,7 @@ const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variabl
 
 export const metadata: Metadata = {
   title: "Soundcheck",
-  description: "Tour intelligence for any live act. Run a soundcheck on your tour before anyone books a venue.",
+  description: "Tour market discovery for independent artist managers. Explore audience signals, travel tradeoffs and culturally aligned partners.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

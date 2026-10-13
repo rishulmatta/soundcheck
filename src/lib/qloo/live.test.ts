@@ -213,11 +213,11 @@ describe("response mapping", () => {
     ]);
     const res = await client.relatedActs(ACT, "artist", { locationQuery: "Boise", take: 1, explain: true });
     expect(res.status).toBe("ok");
-    expect(res.data[0].explanation).toBe("Driven by the act's audience in Boise (influence 87%, affinity 0.91).");
+    expect(res.data[0].explanation).toBe("Recorded contribution from the act signal (score 0.87, affinity 0.91); requested location signal: Boise.");
     expect(res.data[0].affinity).toBeCloseTo(0.91);
   });
 
-  it("computes compare overlap from per-side scores", async () => {
+  it("derives taste similarity from per-side scores without claiming a shared-fan percentage", async () => {
     const { client } = setup([
       json({
         results: [
@@ -230,6 +230,15 @@ describe("response mapping", () => {
     expect(res.status).toBe("ok");
     expect(res.data.overlap).toBeCloseTo(0.75);
     expect(res.data.sharedTags).toEqual(["Dream Pop", "Indie"]);
+    expect(res.meta.note).toContain("not measured shared-fan overlap");
+  });
+
+  it("does not reinterpret an undocumented top-level score as measured audience overlap", async () => {
+    const { client } = setup([json({ results: { overlap: 0.9, similarity: 0.8, score: 0.7 } })]);
+    const res = await client.compareAudiences(ACT, OPENER, "artist");
+    expect(res.status).not.toBe("ok");
+    expect(res.data.overlap).toBe(0);
+    expect(res.meta.note).toContain("No usable per-side scores");
   });
 
   it("aggregates the top-N cells by affinity", () => {

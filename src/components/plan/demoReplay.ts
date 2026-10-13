@@ -1,4 +1,5 @@
 import type { Plan, PlanEvent, TraceStep } from "@/lib/types";
+import { provenanceFor } from "@/lib/provenance";
 
 export interface TimedEvent {
   /** Milliseconds to wait before emitting this event. */
@@ -15,7 +16,7 @@ const RUN_MS: Record<string, number> = { resolve: 800, score: 1700, profile: 120
  * and the city cards arrive in route order once the last step is done.
  */
 export function buildReplay(plan: Plan): TimedEvent[] {
-  const out: TimedEvent[] = [];
+  const out: TimedEvent[] = [{ delay: 0, event: { type: "provenance", provenance: provenanceFor(plan) } }];
   const t0 = 1_700_000_000_000;
   let clock = 0;
   const push = (delay: number, event: PlanEvent) => out.push({ delay, event });

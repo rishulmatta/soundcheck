@@ -147,6 +147,7 @@ const TYPE_LABEL: Record<ActType, string> = { artist: "Artist", person: "Person"
 // ---------- the mock client ----------
 
 export class MockQlooClient implements QlooClient {
+  readonly mode = "mock" as const;
   constructor(private readonly opts: { latencyMs?: number; now?: () => Date } = {}) {}
 
   private async envelope<T>(status: ToolStatus, data: T, req: QlooRequest, ctx: RedactContext, note?: string): Promise<ToolResult<T>> {

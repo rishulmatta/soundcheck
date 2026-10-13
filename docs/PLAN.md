@@ -1,5 +1,7 @@
 # Soundcheck build plan (optimized for the Qloo Agentic Hackathon)
 
+> Historical initial plan, October 11. Implementation and evidence policy have since changed. Use README.md, STATUS.md, and VALIDATION.md for current behavior; endpoint counts and synthetic outputs are not evidence of quality or validated demand.
+
 ## Context
 
 `docs/RESEARCH.md` (the original README) is a research handoff (dated today, 2026-10-11) for Soundcheck, a tour-planning agent built on the Qloo API. Nothing is built yet. The deadline is Oct 30, 2026, 11:45 pm ET, so there are 19 days. The user asked to optimize the project for winning. Winning means scoring on four equally weighted criteria (Qloo depth, design completeness, impact, idea quality) with ties broken on Qloo depth, and passing a pass/fail gate on "would this work without Qloo". Judges may rely on the write-up and automated AI analysis instead of testing the demo.
