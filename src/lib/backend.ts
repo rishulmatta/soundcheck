@@ -19,10 +19,10 @@ export function getBackendBaseUrl(raw = process.env.SOUNDCHECK_BACKEND_URL): str
   return url.origin;
 }
 
-/** Reads an existing backend endpoint without forwarding cookies, credentials, API keys or database configuration. */
+/** Read-only lookup: missing demos must not start a backend agent run while rendering the frontend. */
 export async function fetchBackendPlan(id: string, baseUrl: string, fetchImpl: typeof fetch = fetch): Promise<unknown | null> {
   try {
-    const response = await fetchImpl(`${baseUrl}/api/plan/${encodeURIComponent(id)}`, {
+    const response = await fetchImpl(`${baseUrl}/api/plan/${encodeURIComponent(id)}?stored=1`, {
       cache: "no-store",
       redirect: "error",
       signal: AbortSignal.timeout(12_000),

@@ -22,10 +22,10 @@ describe("backend origin", () => {
 });
 
 describe("backend reads", () => {
-  it("fetches no-store with a bounded timeout, no forwarded secrets, and no redirect following", async () => {
+  it("requests read-only storage lookup with no-store, a bounded timeout, and no forwarded secrets or redirects", async () => {
     const mockFetch = vi.fn(async () => Response.json({ id: "a-plan" }));
     expect(await fetchBackendPlan("a-plan", "https://backend.example.com", mockFetch)).toEqual({ id: "a-plan" });
-    expect(mockFetch).toHaveBeenCalledWith("https://backend.example.com/api/plan/a-plan", {
+    expect(mockFetch).toHaveBeenCalledWith("https://backend.example.com/api/plan/a-plan?stored=1", {
       cache: "no-store", redirect: "error", signal: expect.any(AbortSignal), headers: { Accept: "application/json" },
     });
   });

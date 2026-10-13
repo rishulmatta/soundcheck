@@ -4,7 +4,7 @@
 
 Soundcheck turns an act and a touring brief into candidate cities, a route, potential support acts, sponsor candidates, and local activations. Managers can inspect evidence, lock or drop cities, revise the route, and export a planning brief before contacting venues.
 
-[Open the app](https://soundcheck-production-0c8e.up.railway.app) · [Musician example](https://soundcheck-production-0c8e.up.railway.app/plan/demo-musician) · [Demo script](docs/DEMO.md)
+[Open the app](https://soundcheck-amber-two.vercel.app) · [Musician example](https://soundcheck-amber-two.vercel.app/plan/demo-musician) · [Demo script](docs/DEMO.md)
 
 **Evidence status:** development and published examples have used synthetic Qloo fixtures while the API key is pending. They demonstrate the workflow, not real market findings. Plans display source provenance; unrecorded legacy provenance is treated conservatively. Live geographic comparability and user usefulness have not been validated.
 
