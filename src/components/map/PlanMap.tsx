@@ -28,6 +28,7 @@ import {
   routeProgress,
   type LngLat,
 } from "@/lib/tour/geo";
+import { projectPlan, RouteSketch } from "@/components/plan/RouteSketch";
 import { loadBasemapStyle, readMapTokens, type StyleJson } from "./basemap";
 
 export interface PlanMapController {
@@ -54,7 +55,8 @@ export interface PlanMapProps {
   plan: Plan;
   selectedStop?: number;
   onSelectStop?: (order: number) => void;
-  mode?: "plan" | "tour";
+  /** "hero" is the landing page: the finished plan drawn once, no controls, no interaction, a slow zoom drift. */
+  mode?: "plan" | "tour" | "hero";
   controllerRef?: MutableRefObject<PlanMapController | null>;
   className?: string;
   /** Tour: called once the basemap and layers are ready and the controller is set. */
@@ -129,6 +131,8 @@ function tourPadding() {
 }
 
 const planPadding = { top: 56, bottom: 56, left: 56, right: 56 };
+/** Hero: clear of the caption card in the bottom-left corner. */
+const heroPadding = { top: 40, bottom: 120, left: 40, right: 40 };
 
 interface MarkerEntry {
   order: number;
@@ -190,6 +194,8 @@ export default function PlanMap({
     const rafs = new Set<number>();
     const timers = new Set<ReturnType<typeof setTimeout>>();
     const isTour = mode === "tour";
+    const isHero = mode === "hero";
+    const inert = isTour || isHero;
 
     // ---- derived geometry -------------------------------------------------------------------------------
     const stops = currentPlan.stops;
@@ -261,8 +267,8 @@ export default function PlanMap({
           margin: "0",
           border: "0",
           background: "none",
-          cursor: isTour ? "default" : "pointer",
-          pointerEvents: isTour ? "none" : "auto",
+          cursor: inert ? "default" : "pointer",
+          pointerEvents: inert ? "none" : "auto",
         } satisfies Partial<CSSStyleDeclaration>);
         const disc = document.createElement("span");
         disc.textContent = String(stop.order);
@@ -505,8 +511,9 @@ export default function PlanMap({
             style: style as unknown as never,
             attributionControl: false,
             ...(boundsOrNull
-              ? { bounds: boundsOrNull, fitBoundsOptions: { padding: isTour ? tourPadding() : planPadding, maxZoom: 6 } }
+              ? { bounds: boundsOrNull, fitBoundsOptions: { padding: isTour ? tourPadding() : isHero ? heroPadding : planPadding, maxZoom: 6 } }
               : { center: [-98, 39] as LngLat, zoom: 3.4 }),
+            interactive: !isHero,
             maxPitch: 60,
             dragRotate: false,
             pitchWithRotate: false,
@@ -529,7 +536,7 @@ export default function PlanMap({
           m.touchZoomRotate.disableRotation();
           m.on("dragstart", () => onDragRef.current?.(true));
           m.on("dragend", () => onDragRef.current?.(false));
-        } else {
+        } else if (!isHero) {
           m.addControl(new NavigationControl({ showCompass: false }), "top-right");
           m.touchZoomRotate.disableRotation();
         }
@@ -550,6 +557,8 @@ export default function PlanMap({
           if (disposed) return;
           container.style.opacity = "1";
           if (controllerRef) controllerRef.current = controller;
+          // Hero: a barely perceptible push-in over 40 s, so the map reads as live rather than a screenshot.
+          if (isHero && !prefersReducedMotion()) m.easeTo({ zoom: m.getZoom() + 0.3, duration: 40000, easing: (t) => t, essential: true });
           onReadyRef.current?.();
         };
 
@@ -693,6 +702,12 @@ export default function PlanMap({
     if (prefersReducedMotion()) map.jumpTo(target);
     else map.flyTo({ ...target, duration: 600, essential: true, easing: easeInOut });
   }, [selectedStop, mode, plan.stops]);
+
+  if (fallback && mode === "hero") {
+    // No WebGL or no tiles: the landing shows the static sketch of the same route instead of a list.
+    const sketch = projectPlan(plan);
+    return <RouteSketch route={sketch.route} heat={sketch.heat} width={640} height={400} numbers className={className} label="Route sketch" />;
+  }
 
   if (fallback) {
     return (
