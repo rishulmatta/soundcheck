@@ -7,30 +7,37 @@ Guiding rule: it must look like a promoter's deliverable, not a chatbot. The age
 
 **Visual direction:** dark "stage" theme (near-black background, one warm accent for the act, a cool accent for Qloo signals), condensed tour-poster display type for headings, tabular numerals for scores. Every number from Qloo carries a small "Qloo" tag so judges see provenance at a glance. Mobile stacks everything in the same order.
 
-## Screen 1: Landing (`/`)
+## Screen 1: Landing (`/`) (redesigned 2026-10-13)
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│  SOUNDCHECK          Tour intelligence for any live act.      │
-│  Run a soundcheck on your tour before anyone books a venue.   │
-│                                                               │
-│  ┌─ MUSICIAN ─────┐ ┌─ COMEDIAN ─────┐ ┌─ LIVE PODCAST ───┐   │
-│  │ [act name]     │ │ [act name]     │ │ [show name]      │   │
-│  │ North America  │ │ North America  │ │ US + Canada      │   │
-│  │ 12 stops · Q1  │ │ 10 stops · Q1  │ │ 8 stops · Q2     │   │
-│  │  Open plan →   │ │  Open plan →   │ │  Open plan →     │   │
-│  └────────────────┘ └────────────────┘ └──────────────────┘   │
-│                                                               │
-│  ── or plan your own ──────────────────────────────────────   │
-│  Act  [ Search any artist, comedian, podcast… ▾ ]  (type ▾)   │
-│  Region [North America ▾]  Stops [10]  Window [Jan–Mar 2027]  │
-│  Advanced: locked cities, exclusions, budget tier             │
-│                                  [ Run soundcheck ]           │
-└──────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│ SOUNDCHECK                      How it works  Finished plans  [Plan a tour]│
+│                                                                          │
+│ TOUR INTELLIGENCE · BUILT ON [QLOO]   ┌─ live map, hero mode ──────────┐ │
+│ ROUTE THE TOUR TO WHERE               │  route + markers + heat points │ │
+│ THE FANS ALREADY ARE.                 │  no controls, slow push-in     │ │
+│ One paragraph: what it scores,        │ ┌ FINISHED PLAN ─────────┐     │ │
+│ what it finds, what you get.          │ │ KHRUANGBIN              │     │ │
+│ [See a finished plan →] [Plan your own]│ │ North America · 10 stops│     │ │
+│ · openers · sponsors · share/print/csv│ │ Open the plan →         │     │ │
+│                                       │ └─────────────────────────┘     │ │
+│                                       └────────────────────────────────┘ │
+│ ── HOW IT WORKS ──────────────────────────────────────────────────────── │
+│ ① Name the act      ② Score every city      ③ Take the routed plan       │
+│ ── FINISHED PLANS ────────────────────────────────────────────────────── │
+│ [musician card] [comedian card] [podcast card]  (real route sketch each, │
+│   "Primed, untapped: Boise, Tulsa, Omaha")                               │
+│ ── PLAN YOUR OWN ─────────────────────────────────────────────────────── │
+│ form (act, type, region, stops, window, advanced)      [Run soundcheck]  │
+│ Data: Qloo aggregate affinities. Not predictions about individuals.      │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
-- The three seeded cards open pre-computed plans instantly (cached). No waiting, no quota.
-- Act search box autocompletes via `/search` and shows entity candidates with type and a disambiguation line (e.g. "Artist · Pop · 4.2M fans"). Picking one resolves the Qloo ID before the run starts.
+- The hero map is the real MapLibre map of the stored musician demo in `mode="hero"` (`PlanMap`): the full route drawn once, markers visible, no controls, `interactive: false`, a 40 s push-in of 0.3 zoom. Without WebGL or tiles it shows the static `RouteSketch` of the same route. The page prerenders with the sketch in place and streams the live map in (`connection()` + `getPlan`, never a generation).
+- Demo cards are drawn from the plan actually stored on the server (real route sketch, real stop count, act name as resolved) and carry one concrete line: the untapped stops, or the strongest market. A card whose plan is not stored says "Plan not generated yet" instead of a made-up sketch.
+- Copy is the tour-manager voice from the design system: the headline names the outcome, the paragraph says what is scored, what is found and what you get. No "AI".
+- The form stays at the bottom under its own heading with a one-sentence expectation ("about two minutes"). The top bar's "Plan a tour" and the hero's "Plan your own" jump to it.
+- Act search autocomplete via `/search` is still to do (week 1 list).
 
 ## Screen 2: Live run (`/plan/[id]` while streaming)
 
