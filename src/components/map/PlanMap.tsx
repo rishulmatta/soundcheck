@@ -76,13 +76,25 @@ const EMPTY_FC = { type: "FeatureCollection" as const, features: [] };
 const prefersReducedMotion = () =>
   typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/**
+ * Probed once per page. This is the getSnapshot of a useSyncExternalStore, which React calls on every render, and
+ * each probe would otherwise create a WebGL context that is never released. Browsers cap live contexts (Chrome:
+ * 16 per page) and evict the oldest when the cap is hit, which was the map's own context: the map went blank,
+ * webglcontextlost fired and the component fell back to the list after a handful of re-renders.
+ */
+let webglSupport: boolean | null = null;
 function hasWebGL(): boolean {
+  if (webglSupport !== null) return webglSupport;
   try {
     const canvas = document.createElement("canvas");
-    return !!(canvas.getContext("webgl2") || canvas.getContext("webgl"));
+    const gl = (canvas.getContext("webgl2") || canvas.getContext("webgl")) as WebGLRenderingContext | null;
+    webglSupport = !!gl;
+    // Give the probe context back straight away so it never counts against the cap.
+    gl?.getExtension("WEBGL_lose_context")?.loseContext();
   } catch {
-    return false;
+    webglSupport = false;
   }
+  return webglSupport;
 }
 
 /**
@@ -140,6 +152,8 @@ export default function PlanMap({
   // WebGL support is a property of the browser, not of React state: read it as an external value.
   const webgl = useSyncExternalStore(subscribeNever, hasWebGL, () => true);
   const [failed, setFailed] = useState(false);
+  // Bumped by "Load map again" in the fallback: re-runs the build effect after a transient failure.
+  const [attempt, setAttempt] = useState(0);
   const fallback = !webgl || failed;
 
   // Latest-value refs so the map is built once per dataset, not once per render.
@@ -661,7 +675,7 @@ export default function PlanMap({
       map?.remove();
       map = null;
     };
-  }, [dataKey, mode, controllerRef, webgl]);
+  }, [dataKey, mode, controllerRef, webgl, attempt]);
 
   // Selected marker glow (cheap, no rebuild). In plan mode a selection from outside also flies the camera.
   useEffect(() => {
@@ -698,6 +712,21 @@ export default function PlanMap({
         <p className="label" style={{ margin: "0 0 8px" }}>
           Route
         </p>
+        {webgl && failed && mode === "plan" && (
+          <p style={{ margin: "0 0 12px", fontSize: 13, display: "flex", gap: 12, alignItems: "baseline" }}>
+            <span>The map could not load.</span>
+            <button
+              type="button"
+              onClick={() => {
+                setFailed(false);
+                setAttempt((n) => n + 1);
+              }}
+              style={{ all: "unset", cursor: "pointer", color: "var(--ink)", textDecoration: "underline", textUnderlineOffset: 3 }}
+            >
+              Load map again
+            </button>
+          </p>
+        )}
         <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6 }}>
           {plan.stops.map((s) => (
             <li key={s.order}>
