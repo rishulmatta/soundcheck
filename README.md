@@ -71,6 +71,10 @@ Set `QLOO_API_KEY` and `QLOO_MOCK=0` for real calls. Confirm `/api/health`, vali
 
 ## Deploy
 
+The web app can run on Vercel while the agent API and Redis remain on Railway. Set `SOUNDCHECK_BACKEND_URL` to the Railway HTTPS origin on Vercel only; API requests are forwarded and server-rendered pages read the same persisted plans. Keep this variable unset on Railway to avoid a proxy loop. No model keys or public database access are needed in the Vercel project.
+
+Vercel uses `vercel.json` to select Next.js. Set `ENABLE_EXPERIMENTAL_COREPACK=1` in Vercel so installation follows the pinned `packageManager`, then run `pnpm dlx vercel --prod`. Deploy the Railway backend before the web frontend when API behavior changes.
+
 Railway: `railway up --service soundcheck --ci`. Variables: `REDIS_URL=${{Redis.REDIS_URL}}`, `QLOO_API_KEY`, `QLOO_MOCK`, `ANTHROPIC_API_KEY`. `/api/health` reports the active backend without secrets. Without Redis, development uses memory and `.cache/plans`.
 
 Custom plans are limited per app instance to 2 concurrent runs and 20 starts per 15 minutes; proposals have separate limits. Adjust `SOUNDCHECK_PLAN_CONCURRENCY` and `SOUNDCHECK_PLAN_STARTS` as needed. Saved-plan reads remain available. Limits reset on restart and are not a distributed quota or provider spending cap.

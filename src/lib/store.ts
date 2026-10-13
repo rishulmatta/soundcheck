@@ -10,6 +10,7 @@ import path from "node:path";
 import { getKV } from "@/lib/redis";
 import { Plan } from "@/lib/types";
 import sample from "@/fixtures/plan.sample.json";
+import { fetchBackendPlan, getBackendBaseUrl } from "@/lib/backend";
 
 /** Ids of the seeded demos shown on the landing page. */
 export const SEEDED_PLAN_IDS = ["demo-musician", "demo-comedian", "demo-podcast"] as const;
@@ -55,9 +56,15 @@ async function readStored(id: string): Promise<Plan | null> {
   }
 }
 
-/** A stored plan only (memory, Redis or file). No fixture fallback: seed-on-demand uses this. */
+/** Backend first on the web tier; otherwise memory, Redis or file. No fixture fallback: seed-on-demand uses this. */
 export async function getStoredPlan(id: string): Promise<Plan | null> {
   if (!isValidPlanId(id)) return null;
+  const backend = getBackendBaseUrl();
+  if (backend) {
+    const remote = parsePlan(await fetchBackendPlan(id, backend));
+    // Do not cache remote snapshots in process memory: edits/deletes on Railway should appear on the next read.
+    if (remote?.id === id) return remote;
+  }
   const hit = memory.get(id);
   if (hit) return hit;
   const stored = await readStored(id);

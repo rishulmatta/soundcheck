@@ -6,11 +6,15 @@ import { runPlan } from "@/lib/agent/run";
 import { seedById } from "@/lib/seeds";
 import { getPlan, getStoredPlan } from "@/lib/store";
 import type { Plan } from "@/lib/types";
+import { getBackendBaseUrl } from "@/lib/backend";
 
 const g = globalThis as unknown as { __soundcheckSeeding?: Map<string, Promise<Plan | null>> };
 const inflight = (g.__soundcheckSeeding ??= new Map());
 
 export async function getPlanOrSeed(id: string): Promise<Plan | null> {
+  // Vercel renders the web tier; Railway owns the agent and persistence. An upstream outage must never trigger a
+  // local paid/model run or create a second database of plans. getPlan provides the musician fixture or null.
+  if (getBackendBaseUrl()) return getPlan(id);
   const seed = seedById(id);
   if (!seed) return getPlan(id);
   const existing = await getStoredPlan(id);

@@ -17,8 +17,8 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
 - Homepage focuses on musician research with six-stop default; experimental categories are marked. Source labels appear on plans, tours, replay, print and exports. Print route/economics has a dedicated sheet.
 - Custom plan/proposal endpoints have process-local concurrency and rolling-start limits. Health reads runtime configuration rather than build-time values.
 - Public README rewritten; `docs/DEMO.md` supplies the walkthrough/submission draft; `docs/VALIDATION.md` supplies live-data gates and user-evaluation forms. No outreach, user benefit, or live validation is claimed.
-- Verification: final 185 tests, typecheck, lint, production build and diff checks passed. Desktop and 390px phone layout checked; isolated synthetic six-stop run, revision to five stops, parent preservation and CSV provenance passed with zero model calls. Print preview carries provenance and a separate route/economics sheet.
-- Qloo key remains absent locally. Keep live validation and saved-example regeneration pending. User requested push to origin and deployment; repository is linked to Railway, and requested Vercel URL is being clarified.
+- Verification: 199 tests, typecheck, lint, production build (including Vercel backend configuration) and diff checks passed. Desktop and 390px phone layout checked; isolated synthetic six-stop run, revision to five stops, parent preservation and CSV provenance passed with zero model calls. Print preview carries provenance and a separate route/economics sheet.
+- Qloo key remains absent locally. Keep live validation and saved-example regeneration pending. User explicitly requested Vercel deployment/testing. Vercel project `soundcheck` created in `shunyatechs-projects`; Vercel web frontend uses the existing Railway agent API and private Redis over HTTPS. No public Redis endpoint or duplicated model credentials are required. `SOUNDCHECK_BACKEND_URL` is set only on Vercel; `ENABLE_EXPERIMENTAL_COREPACK=1` selects the pinned pnpm.
 
 ## Done
 - [x] Research handoff written (`docs/RESEARCH.md`)
@@ -103,7 +103,7 @@ Findings from building the Qloo layer against the live docs on 2026-10-12. Each 
 - Nearest-neighbor routing with 1 travel day between stops.
 - Cost model stays at route economics (distance, days, crew, editable rates, break-even). No hotel or flight prices per city.
 - Print-to-PDF via styled page, not a PDF library.
-- Hosting and Redis on Railway (user's paid account); only free resources otherwise. No Vercel, no Upstash.
+- Hosting update October 13: user requested Vercel for the web app. The Railway agent/Redis backend remains in place; Vercel forwards API requests and reads saved plans over HTTPS. No new database provider.
 - Repo private until the public README is written. Devpost rules (verified 2026-10-11) require a public repo with a visible license at submission; nothing requires it public during the build.
 
 - [x] **Act identity (2026-10-12):** the plan header and print cover show the resolved act's picture, a one-line description and "Confirm" links (Wikipedia, official site, Spotify, Apple Podcasts, YouTube, Instagram, X, IMDb). Fetched online at run time in `src/lib/actProfile.ts`: Qloo entity image / `external` ids first (live key), Wikipedia REST + Wikidata as the free fallback (works in mock mode). Cached in KV under `profile:v2:*`. Tests stub the lookup (`RunDeps.profile`). Stored plans without the fields parse fine (`links` defaults to []).
