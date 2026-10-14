@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PlanInput, type CityPoolEntry } from "@/lib/types";
-import { agentPrompt, withoutQlooPrompt, PLANNING_OBJECTIVE } from "./prompts";
+import { agentPrompt, AGENT_INSTRUCTIONS, COPY_INSTRUCTIONS, SAFE_USE_RULES, withoutQlooPrompt, PLANNING_OBJECTIVE } from "./prompts";
 
 describe("comparison prompt constraints", () => {
   it("gives both arms the same objective, candidate pool, and all planning constraints", () => {
@@ -31,5 +31,27 @@ describe("comparison prompt constraints", () => {
       expect(candidates).not.toContain("Leeds");
     }
     expect(prompts[1]).toContain(prompts[0]);
+  });
+});
+
+describe("heatmap comparability wording", () => {
+  it("states the region-wide heatmap scope in the safe-use rules without the old blanket caveat", () => {
+    expect(SAFE_USE_RULES).not.toContain("Cross-city heatmap comparability is unverified");
+    expect(SAFE_USE_RULES).toContain("one region-wide Qloo heatmap query");
+    expect(SAFE_USE_RULES).toMatch(/not ticket demand, booking history or venue availability/);
+  });
+
+  it("tells the agent to probe the pool once and keeps the thin-city re-seed", () => {
+    expect(AGENT_INSTRUCTIONS).toMatch(/probeCities once with seed "act", passing the whole candidate pool/);
+    expect(AGENT_INSTRUCTIONS).toContain('probeCities again for those cities with seed "tags"');
+    expect(AGENT_INSTRUCTIONS).toContain("affinity exceeds popularity by at least 0.02");
+    expect(AGENT_INSTRUCTIONS).toContain("no movement in Qloo's series");
+    expect(AGENT_INSTRUCTIONS).not.toMatch(/weeks/);
+  });
+
+  it("switches the whyHere source rule on facts.qloo.heatmapComparability", () => {
+    expect(COPY_INSTRUCTIONS).toContain("facts.qloo.heatmapComparability");
+    expect(COPY_INSTRUCTIONS).toMatch(/"region-normalized":[^\n]*region-wide[^\n]*Do not call the comparison unverified/);
+    expect(COPY_INSTRUCTIONS).toMatch(/"unverified": every sentence must include "unverified"/);
   });
 });

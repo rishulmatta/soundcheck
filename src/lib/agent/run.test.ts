@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { QlooClient, RelatedEntity } from "@/lib/qloo/contract";
+import type { CityHeatmap, QlooClient, RelatedEntity } from "@/lib/qloo/contract";
 import { Plan, PlanInput, type CityPoolEntry, type PlanEvent, type ToolResult, type ToolStatus } from "@/lib/types";
 import type { AgentModel } from "./model";
 import type { AgentToolSpec } from "./tools";
@@ -18,13 +18,16 @@ const unit = (s: string) => (hash(s) % 1000) / 1000;
 const ok = <T>(data: T, request: string, status: ToolStatus = "ok"): ToolResult<T> => ({ status, data, meta: { request, ms: 5, cached: false } });
 
 interface StubOptions {
-  /** Cities whose act-seeded heatmap is empty (thin data). */
+  /** Cities whose act-seeded heatmap row has no cells in reach (thin data). */
   thinCities?: string[];
   searchEmpty?: boolean;
+  mode?: "mock" | "live";
+  trend?: { trend: "rising" | "flat" | "falling" | "unknown"; velocity?: number };
 }
 
-function stubQloo(opts: StubOptions = {}): QlooClient & { calls: Record<string, number> } {
+function stubQloo(opts: StubOptions = {}): QlooClient & { calls: Record<string, number>; heatmapRequests: { seed: "act" | "tags"; cities: string[] }[] } {
   const calls: Record<string, number> = {};
+  const heatmapRequests: { seed: "act" | "tags"; cities: string[] }[] = [];
   const hit = (k: string) => (calls[k] = (calls[k] ?? 0) + 1);
   const related = (prefix: string, n: number): RelatedEntity[] =>
     Array.from({ length: n }, (_, i) => ({
@@ -36,8 +39,9 @@ function stubQloo(opts: StubOptions = {}): QlooClient & { calls: Record<string, 
       explanation: i === 0 ? "Fans also favour shoegaze." : undefined,
     }));
   return {
-    mode: "mock",
+    mode: opts.mode ?? "mock",
     calls,
+    heatmapRequests,
     async searchEntity(query, type) {
       hit("searchEntity");
       if (opts.searchEmpty) return ok([], "GET /search?query=[act]", "empty");
@@ -53,12 +57,20 @@ function stubQloo(opts: StubOptions = {}): QlooClient & { calls: Record<string, 
       hit("findTags");
       return ok([{ id: `urn:tag:${query.replace(/\W+/g, "_")}`, name: query }], "GET /v2/tags?filter.query=[q]");
     },
-    async heatmapForCity(seed, city) {
-      hit("heatmapForCity");
-      const req = `GET /v2/insights?filter.type=urn:heatmap&filter.location.query=${encodeURIComponent(city.name)}`;
-      const thin = seed.entityIds && opts.thinCities?.includes(city.id);
-      if (thin) return ok({ city, affinity: 0, affinityRank: 0, popularity: 0, cells: [] }, req, "empty");
-      return ok({ city, affinity: 0.4 + 0.6 * unit(city.id), affinityRank: 1, popularity: unit(city.id + "p"), cells: [] }, req);
+    async heatmapForCities(seed, cities, region) {
+      hit("heatmapForCities");
+      heatmapRequests.push({ seed: seed.entityIds ? "act" : "tags", cities: cities.map((c) => c.id) });
+      const req = "GET /v2/insights?filter.type=urn:heatmap&filter.location=[region polygon]";
+      const rows: CityHeatmap[] = cities.map((city) => {
+        const thin = seed.entityIds && opts.thinCities?.includes(city.id);
+        if (thin) return { city, affinity: 0, affinityRank: 0, popularity: 0, cells: [] };
+        const affinity = 0.4 + 0.6 * unit(city.id);
+        const popularity = unit(city.id + "p");
+        return { city, affinity, affinityRank: 1, popularity, cells: [{ lat: city.lat, lon: city.lon, affinity, affinityRank: 1, popularity }] };
+      });
+      const thinCount = rows.filter((r) => r.cells.length === 0).length;
+      const status: ToolStatus = thinCount === 0 ? "ok" : thinCount === rows.length ? "empty" : "partial";
+      return ok({ region, polygon: "POLYGON((0 0,1 0,1 1,0 1,0 0))", cellCount: rows.length - thinCount, cities: rows }, req, status);
     },
     async demographics(_seed, o) {
       hit("demographics");
@@ -75,9 +87,10 @@ function stubQloo(opts: StubOptions = {}): QlooClient & { calls: Record<string, 
         `GET /v2/insights?filter.type=urn:demographics${o?.locationQuery ? "&signal.location.query=[city]" : ""}`,
       );
     },
-    async trending() {
+    async trending(_id, _type, o) {
       hit("trending");
-      return ok({ trend: "rising" as const, velocity: 0.42, weeks: 8 }, "GET /v2/trending?signal.interests.entities=[act]");
+      const t = opts.trend ?? { trend: "rising" as const, velocity: 0.42 };
+      return ok({ ...t, weeks: o?.weeks }, "GET /v2/trending?signal.interests.entities=[act]");
     },
     async relatedActs(_id, _type, o) {
       hit("relatedActs");
@@ -167,6 +180,11 @@ describe("runPlan without a model (orchestrator only)", () => {
       expect(stop.whyHere).toMatch(/cross-city comparability is unverified/);
     }
     expect(plan.stops[0].legDays).toBe(0);
+    // One region-wide heatmap query scores the whole pool; trending asks for the 26-week minimum.
+    expect(qloo.calls.heatmapForCities).toBe(1);
+    expect(plan.candidates).toHaveLength(cityPoolFor("north-america").length);
+    expect(plan.momentum.weeks).toBe(26);
+    expect(plan.trace.find((s) => s.id === "score")?.summary).toMatch(/^one region heatmap, \d+ cells, \d+ cities; \d+ primed-and-less-known candidates?$/);
 
     // All ten Qloo call types, every call on the trace with its redacted request.
     expect(plan.summary.qlooCallTypes).toBe(10);
@@ -212,7 +230,25 @@ describe("runPlan without a model (orchestrator only)", () => {
       expect(c?.affinity).toBeGreaterThan(0);
     }
     expect(plan.trace.find((s) => s.id === "score")?.status).toBe("degraded");
+    expect(plan.trace.find((s) => s.id === "score")?.summary).toMatch(/thin cities re-seeded by taste tags/);
     expect(plan.summary.overallStatus).toBe("degraded");
+  });
+
+  it("makes one act-seeded region call over the whole pool and one tag call for just the thin cities", async () => {
+    const pool = cityPoolFor("north-america").slice(0, 12);
+    const qloo = stubQloo({ thinCities: ["boise", "phoenix"] });
+    const input = PlanInput.parse({ ...baseInput, excludedCities: ["seattle"] });
+    const { plan } = await run(input, { qloo, model: null, pool });
+    expect(qloo.calls.heatmapForCities).toBe(2);
+    // The act-seeded polygon covers the region's full pool (exclusions included) so normalization is stable...
+    expect(qloo.heatmapRequests[0]).toEqual({ seed: "act", cities: pool.map((c) => c.id) });
+    // ...but excluded cities are never scored.
+    expect(plan.candidates.map((c) => c.id)).not.toContain("seattle");
+    expect(plan.candidates).toHaveLength(11);
+    expect(qloo.heatmapRequests[1].seed).toBe("tags");
+    expect([...qloo.heatmapRequests[1].cities].sort()).toEqual(["boise", "phoenix"]);
+    // One trace entry per region call.
+    expect(plan.trace.find((s) => s.id === "score")?.calls).toHaveLength(2);
   });
 
   it("still plans when the act cannot be resolved", async () => {
@@ -232,8 +268,10 @@ describe("runPlan with a model", () => {
         const found = (await call(tools, "searchAct", { query: "The Example Band" })) as { candidates: { id: string }[] };
         await call(tools, "confirmAct", { entityId: found.candidates[0].id });
         await call(tools, "getTasteTags", {});
-        // Under-probes on purpose: only 5 cities, below the guard's minimum of 12.
-        await call(tools, "probeCities", { cityIds: ["seattle", "boise", "denver", "omaha", "tulsa"] });
+        // Passes only 5 cities: the region-wide query still scores the whole pool, so the guard has nothing to add.
+        const probed = (await call(tools, "probeCities", { cityIds: ["seattle", "boise", "denver", "omaha", "tulsa"] })) as { results: unknown[]; probed: number };
+        expect(probed.results).toHaveLength(5);
+        expect(probed.probed).toBe(cityPoolFor("north-america").length);
         await call(tools, "scoreCities", {});
         const routed = (await call(tools, "routeTour", { stops: 4 })) as { order: { cityId: string }[] };
         expect(routed.order).toHaveLength(4);
@@ -249,9 +287,10 @@ describe("runPlan with a model", () => {
     expect(agent?.status).toBe("ok");
     expect(agent?.summary).toMatch(/8 tool calls over 8 steps/);
     const guard = plan.trace.find((s) => s.id === "guard");
-    expect(guard?.summary).toMatch(/probed 7 more cities/);
-    expect(guard?.summary).toMatch(/re-routed/);
-    expect(plan.candidates).toHaveLength(12);
+    expect(guard?.summary).not.toMatch(/heatmap/);
+    expect(guard?.summary).toMatch(/re-routed to the requested 6 stops/);
+    expect(qloo.calls.heatmapForCities).toBe(1);
+    expect(plan.candidates).toHaveLength(cityPoolFor("north-america").length);
     expect(plan.stops).toHaveLength(6); // guard re-routed with the requested stop count
     // The model's venue tag choice was kept (the guard did not pick its own).
     expect(qloo.calls.findTags).toBe(1);
@@ -389,13 +428,8 @@ describe("runPlan revisions", () => {
 
   it("re-scores the parent's candidate field, not the whole pool, so only the requested change moves the route", async () => {
     const field = ["seattle", "portland", "boise", "salt-lake-city", "denver", "omaha", "kansas-city", "minneapolis", "chicago", "detroit", "nashville", "atlanta", "tulsa", "austin"];
-    const model = stubModel({
-      async runAgent({ tools }) {
-        await call(tools, "probeCities", { cityIds: field });
-        return { steps: 1, toolCalls: 1, text: "" };
-      },
-    });
-    const { plan: parent } = await run(baseInput, { qloo: stubQloo(), model });
+    // A parent scored over a narrower field (e.g. saved before the region-wide heatmap) keeps that field on revision.
+    const { plan: parent } = await run(baseInput, { qloo: stubQloo(), model: null, pool: pool.filter((c) => field.includes(c.id)) });
     expect(parent.candidates.map((c) => c.id).sort()).toEqual([...field].sort());
 
     const ids = parent.stops.map((s) => s.city.id);
@@ -405,7 +439,9 @@ describe("runPlan revisions", () => {
     const { plan } = await revise(restoredParent, c, { qloo, model: stubModel() });
     const expected = [...field.filter((id) => id !== ids[2]), "halifax"].sort();
     expect(plan.candidates.map((x) => x.id).sort()).toEqual(expected);
-    expect(qloo.calls.heatmapForCity).toBe(expected.length);
+    // One act-seeded region call over the full pool (the same polygon as the parent's, so a cache hit live).
+    expect(qloo.calls.heatmapForCities).toBe(1);
+    expect(qloo.heatmapRequests[0].cities).toEqual(pool.map((city) => city.id));
     // Every surviving stop of the parent is still routed; one new city fills the dropped slot.
     const kept = ids.filter((id) => id !== ids[2]);
     expect(plan.stops.map((s) => s.city.id)).toEqual(expect.arrayContaining(kept));
@@ -493,6 +529,45 @@ describe("evidence and source safeguards", () => {
     expect(plan.provenance?.dataMode).toBe("unknown");
   });
 
+  it("labels live plans region-normalized and switches the copy rule from 'unverified' to the region heatmap", async () => {
+    const qloo = stubQloo({ mode: "live", trend: { trend: "flat", velocity: 0 } });
+    const seen: { qloo: { heatmapComparability: string; momentum: string }; writing: { leadWith: string } }[] = [];
+    let n = 0;
+    const model = stubModel({
+      writeStopCopy: async (facts) => {
+        const f = facts as { city: string; qloo: { affinity: number; heatmapComparability: string; momentum: string }; soundcheck: { suggestedCapacity: number }; writing: { leadWith: string } };
+        seen.push(f);
+        n++;
+        return n % 2
+          ? { suggestion: `Room-size assumption: ${f.soundcheck.suggestedCapacity} capacity.`, whyHere: `Affinity ${f.qloo.affinity} in Qloo's region-wide heatmap makes ${f.city} a research lead.` }
+          : { suggestion: `Room-size assumption: ${f.soundcheck.suggestedCapacity} capacity.`, whyHere: `${f.city} has affinity ${f.qloo.affinity}.` };
+      },
+    });
+    const { plan } = await run(baseInput, { qloo, model });
+    expect(plan.provenance).toMatchObject({ dataMode: "live", heatmapComparability: "region-normalized" });
+    expect(seen.every((f) => f.qloo.heatmapComparability === "region-normalized")).toBe(true);
+    expect(seen.every((f) => f.qloo.momentum === "no movement in Qloo's series")).toBe(true);
+    expect(seen.some((f) => f.writing.leadWith.includes("one region-wide Qloo heatmap"))).toBe(true);
+    expect(plan.trace.find((s) => s.id === "momentum")?.summary).toBe("trending 26 weeks: no movement in Qloo's series");
+    // Accepted model copy names the region heatmap; copy without it falls back to the region template.
+    for (const stop of plan.stops) {
+      expect(stop.whyHere).toMatch(/region-wide (?:Qloo )?heatmap/);
+      expect(stop.whyHere).not.toMatch(/unverified/);
+    }
+    expect(plan.stops.some((s) => s.whyHere.startsWith("Research lead:"))).toBe(true);
+    expect(plan.trace.find((s) => s.id === "explain")?.summary).toMatch(/model for 3\/6 stops/);
+  });
+
+  it("checks region-normalized copy for the region heatmap source and a research-lead framing", () => {
+    const suggestion = "Room-size assumption: 1200 capacity";
+    expect(copyMeetsEvidenceLimits({ suggestion, whyHere: "Affinity 0.8 in Qloo's region-wide heatmap; a lead to investigate." }, "region-normalized")).toBe(true);
+    expect(copyMeetsEvidenceLimits({ suggestion, whyHere: "Affinity 0.8; cross-city comparability unverified" }, "region-normalized")).toBe(false);
+    expect(copyMeetsEvidenceLimits({ suggestion, whyHere: "Affinity 0.8 in Qloo's region-wide heatmap." }, "region-normalized")).toBe(false);
+    expect(copyMeetsEvidenceLimits({ suggestion, whyHere: "Region-wide heatmap says it will sell; a research lead." }, "region-normalized")).toBe(false);
+    // Unverified facts keep the old rule.
+    expect(copyMeetsEvidenceLimits({ suggestion, whyHere: "Affinity 0.8 in Qloo's region-wide heatmap; a lead to investigate." }, "unverified")).toBe(false);
+  });
+
   it("rejects unsupported copy even when it uses only allowed numbers", () => {
     expect(copyMeetsEvidenceLimits({ suggestion: "Room-size assumption: 1200 capacity", whyHere: "80% audience overlap; comparability unverified" })).toBe(false);
     expect(copyMeetsEvidenceLimits({ suggestion: "1200-cap room", whyHere: "This city is primed" })).toBe(false);
@@ -560,6 +635,11 @@ describe("leadAngle", () => {
     const a3 = leadAngle(3, demo, "unknown", 0);
     expect(a1).not.toBe(a2);
     expect(a3).toBe(a1);
+  });
+  it("names the region heatmap instead of the unverified caveat for region-normalized facts", () => {
+    expect(leadAngle(1, demo, "unknown", 0, "region-normalized")).toMatch(/one region-wide Qloo heatmap/);
+    expect(leadAngle(1, demo, "unknown", 0, "region-normalized")).not.toMatch(/unverified/);
+    expect(leadAngle(1, demo, "unknown", 0)).toMatch(/comparability is unverified/);
   });
   it("adds momentum and travel angles only when there is something to say", () => {
     const angles = new Set([1, 2, 3, 4].map((o) => leadAngle(o, demo, "rising", 2)));

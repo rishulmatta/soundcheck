@@ -23,7 +23,10 @@ const TREND = { rising: "Rising", flat: "Flat", falling: "Falling", unknown: "Un
 /** The promoter deliverable: cover page, then one city per page. No interactive elements except the print button. */
 export function PrintView({ plan }: { plan: Plan }) {
   const { act, momentum } = plan;
-  const { dataMode } = provenanceFor(plan);
+  const { dataMode, heatmapComparability } = provenanceFor(plan);
+  const regionNormalized = heatmapComparability === "region-normalized";
+  // Qloo's trending series has been flat (velocity 0) for every act probed: say so rather than imply a measured trend.
+  const trendLabel = momentum.trend === "flat" && !momentum.velocity ? "No movement in Qloo’s series" : TREND[momentum.trend];
   const confirmedMatch = hasConfirmedQlooMatch(plan);
   const sketch = projectPlan(plan);
   const untapped = plan.stops.filter((s) => s.city.quadrant === "untapped");
@@ -61,7 +64,7 @@ export function PrintView({ plan }: { plan: Plan }) {
           <p className="mt-1 flex flex-wrap items-center gap-x-3 text-[15px] leading-[22px]">
             <span className="label">Momentum</span>
             <QlooTag />
-            <span>{TREND[momentum.trend]}</span>
+            <span>{trendLabel}</span>
             {momentum.velocity !== undefined && (
               <span className="text-[13px] text-ink-muted">
                 rank velocity <span className="num text-ink">{momentum.velocity > 0 ? "+" : ""}{momentum.velocity.toFixed(2)}</span>
@@ -90,9 +93,13 @@ export function PrintView({ plan }: { plan: Plan }) {
             <div className="overflow-hidden rounded-md border border-line">
               <RouteSketch route={sketch.route} heat={sketch.heat} numbers width={360} height={300} className="block h-auto w-full" label={`Route for ${act.name}`} />
             </div>
-            <QuadrantChart candidates={plan.candidates} stops={plan.stops} animate={false} panel={false} className="rounded-md border border-line bg-bg-raised p-2" />
+            <QuadrantChart candidates={plan.candidates} stops={plan.stops} comparability={heatmapComparability} animate={false} panel={false} className="rounded-md border border-line bg-bg-raised p-2" />
           </div>
-          <p className="mt-2 text-xs leading-4 text-ink-muted">Left: route and heat by fan affinity. Right: affinity against popularity for {pool} candidate cities; the shaded cell has higher affinity and lower popularity. Rankings are provisional.</p>
+          <p className="mt-2 text-xs leading-4 text-ink-muted">Left: route and heat by fan affinity. Right: affinity against popularity for {pool} candidate cities;{" "}
+            {regionNormalized
+              ? "the shaded area is primed (affinity 0.5 or more) and less known than its fit suggests (affinity above popularity), from one region-wide Qloo heatmap. Rankings are Soundcheck heuristics."
+              : "the shaded cell has higher affinity and lower popularity. Rankings are provisional."}
+          </p>
 
           <ProvenanceFooter plan={plan} className="mt-6" />
         </section>
@@ -114,7 +121,8 @@ export function PrintView({ plan }: { plan: Plan }) {
             <CityCard plan={plan} stop={s} poolSize={pool} animate={false} print className="p-6" breakEven={econ.breakEven.get(s.order) ? { b: econ.breakEven.get(s.order)!, units: econ.units, rates: econ.rates } : undefined} />
             {s.city.quadrant === "untapped" && (
               <p className="mt-3 flex items-center gap-2 text-[13px] leading-[18px] text-ink-muted">
-                <MarketBadge quadrant="untapped" size="sm" /> Higher affinity, lower popularity. A market to investigate; booking history is unknown.
+                <MarketBadge quadrant="untapped" size="sm" />{" "}
+                {regionNormalized ? "Primed, and less known than its fit suggests." : "Higher affinity, lower popularity."} A market to investigate; booking history is unknown.
               </p>
             )}
             <ProvenanceFooter plan={plan} className="mt-6" />

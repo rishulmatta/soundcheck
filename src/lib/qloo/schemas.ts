@@ -6,9 +6,20 @@
  * Shapes follow docs.qloo.com (heatmaps-use-case, demographics-use-case, taste-analysis, get-trending, schema-taxonomy).
  */
 import { z } from "zod";
-import type { ActType, CityPoolEntry } from "@/lib/types";
+import type { ActType, CityPoolEntry, Region } from "@/lib/types";
+import { CITY_CELL_RADIUS_KM, distanceKm } from "@/lib/geo";
 import { linksFromQlooExternal } from "@/lib/actProfile";
-import type { CityHeatmap, CompareData, DemographicsData, EntityCandidate, HeatmapCell, RelatedEntity, TagRef, TrendingData } from "./contract";
+import type {
+  CityHeatmap,
+  CompareData,
+  DemographicsData,
+  EntityCandidate,
+  HeatmapCell,
+  RegionHeatmap,
+  RelatedEntity,
+  TagRef,
+  TrendingData,
+} from "./contract";
 
 // ---------- helpers ----------
 
@@ -103,28 +114,15 @@ export const HeatmapPointSchema = z
   })
   .passthrough();
 
-const LocalityRef = z
-  .object({
-    entity_id: str,
-    name: str,
-    disambiguation: str,
-    location: opt(z.object({ lat: num, lng: num, lon: num }).passthrough()),
-  })
-  .passthrough();
-
+/**
+ * Heatmap body. A `filter.location=<WKT polygon>` query carries no `query.localities` block (key day, 2026-10-14),
+ * so only the cells are read.
+ */
 export const HeatmapResponse = z
   .object({
     success: opt(z.boolean()),
     results: opt(z.object({ heatmap: opt(z.array(z.unknown())) }).passthrough()),
-    query: opt(
-      z
-        .object({
-          // heatmaps-use-case shows query.localities.filter; the parameter reference mentions query.locality.signal.
-          localities: opt(z.object({ filter: opt(LocalityRef), signal: opt(LocalityRef) }).passthrough()),
-          locality: opt(z.object({ filter: opt(LocalityRef), signal: opt(LocalityRef) }).passthrough()),
-        })
-        .passthrough(),
-    ),
+    query: opt(z.unknown()),
   })
   .passthrough();
 
@@ -184,13 +182,31 @@ export const TrendingResponse = z
   .passthrough();
 
 /**
- * GET /v2/analysis/compare. The docs give no example body: the OpenAPI says `results` is an array of entity-like items.
- * We accept results as an array, or an object holding tags/entities arrays, and look for per-side scores defensively.
+ * GET /v2/analysis/compare (live body captured on key day, 2026-10-14): `results.tags[]` are the tags the two sides
+ * share, each with `query.score` (0..1); `results.a[]` / `results.b[]` are each side's own tag lists (`query.count`);
+ * `results.matchEntities` was []. There are no per-side affinities.
  */
+const CompareTagSchema = z
+  .object({
+    tag_id: str,
+    id: str,
+    name: str,
+    query: opt(z.object({ score: num }).passthrough()),
+  })
+  .passthrough();
+
 export const CompareResponse = z
   .object({
     success: opt(z.boolean()),
-    results: opt(z.unknown()),
+    results: opt(
+      z
+        .object({
+          tags: opt(z.array(z.unknown())),
+          a: opt(z.array(z.unknown())),
+          b: opt(z.array(z.unknown())),
+        })
+        .passthrough(),
+    ),
   })
   .passthrough();
 
@@ -345,18 +361,8 @@ export function aggregateHeatmap(cells: HeatmapCell[], topN = HEATMAP_TOP_N): { 
   };
 }
 
-export interface ParsedHeatmap {
-  heatmap: CityHeatmap;
-  locality?: { id?: string; name?: string; disambiguation?: string };
-  /** True when the strongest cell has affinity exactly 1, a hint that Qloo normalized affinity within this city. */
-  normalizedWithinCity: boolean;
-}
-
-export function toCityHeatmap(body: unknown, city: CityPoolEntry): ParsedHeatmap | undefined {
-  const r = HeatmapResponse.safeParse(body);
-  if (!r.success) return undefined;
-  const points = parseList(HeatmapPointSchema, r.data.results?.heatmap);
-  const cells: HeatmapCell[] = points
+function toHeatmapCells(list: unknown): HeatmapCell[] {
+  return parseList(HeatmapPointSchema, list)
     .filter((p) => p.query.affinity !== undefined)
     .map((p) => ({
       lat: p.location.latitude,
@@ -365,13 +371,27 @@ export function toCityHeatmap(body: unknown, city: CityPoolEntry): ParsedHeatmap
       affinityRank: clamp01(p.query.affinity_rank ?? 0),
       popularity: clamp01(p.query.popularity ?? 0),
     }));
-  const agg = aggregateHeatmap(cells);
-  const q = r.data.query;
-  const loc = q?.localities?.filter ?? q?.localities?.signal ?? q?.locality?.filter ?? q?.locality?.signal;
+}
+
+/**
+ * One region-wide heatmap (filter.location=<polygon>) cut up by city. Each cell counts toward every requested city
+ * whose centroid is within CITY_CELL_RADIUS_KM, so a cell between two close cities counts for both. Each city is
+ * aggregated with aggregateHeatmap (top-N mean). Values are comparable across cities because Qloo normalized them
+ * over the whole polygon, which also means they shift if the polygon (the city set) changes.
+ * Cities with no cell in reach keep an empty `cells` list and zero values. Returns undefined on an unparseable body.
+ */
+export function toRegionHeatmap(body: unknown, cities: CityPoolEntry[], region: Region, polygon: string): RegionHeatmap | undefined {
+  const r = HeatmapResponse.safeParse(body);
+  if (!r.success) return undefined;
+  const cells = toHeatmapCells(r.data.results?.heatmap);
   return {
-    heatmap: { city, ...agg, cells },
-    locality: loc ? { id: loc.entity_id, name: loc.name, disambiguation: loc.disambiguation } : undefined,
-    normalizedWithinCity: cells.length > 1 && cells.some((c) => c.affinity === 1),
+    region,
+    polygon,
+    cellCount: cells.length,
+    cities: cities.map((city): CityHeatmap => {
+      const near = cells.filter((c) => distanceKm(city, c) <= CITY_CELL_RADIUS_KM);
+      return { city, ...aggregateHeatmap(near), cells: near };
+    }),
   };
 }
 
@@ -453,53 +473,48 @@ export function toTrending(body: unknown): TrendingData | undefined {
   return { trend, velocity, weeks: rows.length, series };
 }
 
+export interface ParsedCompare {
+  data: CompareData;
+  /** Distinct tags across both sides (shared + side-only). */
+  items: number;
+  /** True when the body carried the shared and per-side tag lists. */
+  scored: boolean;
+  counts: { shared: number; onlyA: number; onlyB: number };
+}
+
 /**
- * Derived taste similarity from /v2/analysis/compare. For each result item we look for an a-side and b-side affinity
- * (query.a.affinity / query.b.affinity, a.affinity / b.affinity, or affinity_a / affinity_b). Similarity is the mean of
- * min(a,b)/max(a,b) over the top 10 items ranked by min(a,b): 1 means the two audiences weight shared tastes equally.
- * This is Soundcheck's heuristic, not measured fanbase overlap. Unverified top-level overlap/similarity/score fields
- * are not used: their semantics have not been validated. Returns `scored: false` when no per-side scores exist.
+ * Derived taste-tag similarity from /v2/analysis/compare. This is Soundcheck's index over tag sets, never measured
+ * fan overlap. Jaccard over tag ids:
+ *   shared = results.tags ids, plus any id listed in both results.a and results.b
+ *   onlyA  = results.a ids not in shared;  onlyB = results.b ids not in shared
+ *   overlap = shared / (shared + onlyA + onlyB), rounded to 2 decimals (0 when all three are empty)
+ * a and b mostly exclude the shared tags but not always (the key-day body repeated 2 shared tags in each), hence the
+ * dedupe. sharedTags = the top 5 results.tags names by query.score. `scored` is false when tags/a/b are not all arrays.
  */
-export function toCompare(body: unknown): { data: CompareData; items: number; scored: boolean } | undefined {
+export function toCompare(body: unknown): ParsedCompare | undefined {
   const r = CompareResponse.safeParse(body);
   if (!r.success) return undefined;
-  const results = r.data.results;
-  let items: unknown[] = [];
-  if (Array.isArray(results)) items = results;
-  else if (results && typeof results === "object") {
-    const obj = results as Record<string, unknown>;
-    for (const k of ["tags", "entities", "results"]) if (Array.isArray(obj[k])) items = items.concat(obj[k] as unknown[]);
+  const res = r.data.results;
+  const none: ParsedCompare = { data: { overlap: 0, sharedTags: [] }, items: 0, scored: false, counts: { shared: 0, onlyA: 0, onlyB: 0 } };
+  if (!res || !Array.isArray(res.tags) || !Array.isArray(res.a) || !Array.isArray(res.b)) return none;
+  const parse = (list: unknown[]) =>
+    parseList(CompareTagSchema, list)
+      .map((t) => ({ id: t.tag_id ?? t.id, name: t.name, score: t.query?.score ?? 0 }))
+      .filter((t): t is { id: string; name: string | undefined; score: number } => !!t.id);
+  const sharedList = parse(res.tags);
+  const aIds = new Set(parse(res.a).map((t) => t.id));
+  const bIds = new Set(parse(res.b).map((t) => t.id));
+  const shared = new Set(sharedList.map((t) => t.id));
+  for (const id of aIds) if (bIds.has(id)) shared.add(id);
+  const onlyA = [...aIds].filter((id) => !shared.has(id)).length;
+  const onlyB = [...bIds].filter((id) => !shared.has(id)).length;
+  const items = shared.size + onlyA + onlyB;
+  const overlap = items === 0 ? 0 : round(shared.size / items, 2);
+  const sharedTags: string[] = [];
+  for (const t of [...sharedList].sort((x, y) => y.score - x.score)) {
+    const name = t.name ?? humanizeUrn(t.id);
+    if (!sharedTags.includes(name)) sharedTags.push(name);
+    if (sharedTags.length >= 5) break;
   }
-  const scoredItems: { name: string; a: number; b: number }[] = [];
-  const names: string[] = [];
-  for (const raw of items) {
-    if (!raw || typeof raw !== "object") continue;
-    const o = raw as Record<string, unknown>;
-    const name = typeof o.name === "string" ? o.name : typeof o.tag_id === "string" ? humanizeUrn(o.tag_id) : undefined;
-    if (!name) continue;
-    names.push(name);
-    const q = (o.query && typeof o.query === "object" ? o.query : o) as Record<string, unknown>;
-    const side = (k: "a" | "b") => {
-      const s = q[k];
-      if (typeof s === "number") return s;
-      if (s && typeof s === "object" && typeof (s as Record<string, unknown>).affinity === "number")
-        return (s as Record<string, number>).affinity;
-      const flat = q[`affinity_${k}`];
-      return typeof flat === "number" ? flat : undefined;
-    };
-    const a = side("a");
-    const b = side("b");
-    if (a !== undefined && b !== undefined) scoredItems.push({ name, a, b });
-  }
-  if (items.length === 0) return { data: { overlap: 0, sharedTags: [] }, items: 0, scored: false };
-  if (scoredItems.length === 0) {
-    return { data: { overlap: 0, sharedTags: names.slice(0, 5) }, items: items.length, scored: false };
-  }
-  const ranked = scoredItems.sort((x, y) => Math.min(y.a, y.b) - Math.min(x.a, x.b)).slice(0, 10);
-  const ratio = (x: { a: number; b: number }) => {
-    const hi = Math.max(Math.abs(x.a), Math.abs(x.b));
-    return hi === 0 ? 0 : Math.max(0, Math.min(x.a, x.b)) / hi;
-  };
-  const overlap = ranked.reduce((s, x) => s + ratio(x), 0) / ranked.length;
-  return { data: { overlap: round(clamp01(overlap)), sharedTags: ranked.slice(0, 5).map((x) => x.name) }, items: items.length, scored: true };
+  return { data: { overlap, sharedTags }, items, scored: true, counts: { shared: shared.size, onlyA, onlyB } };
 }

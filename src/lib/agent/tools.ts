@@ -13,6 +13,7 @@ import type {
   DemographicsData,
   EntityCandidate,
   QlooClient,
+  RegionHeatmap,
   RelatedEntity,
   TagRef,
 } from "@/lib/qloo/contract";
@@ -56,7 +57,7 @@ type QlooMethod = Exclude<keyof QlooClient, "mode">;
 const CALL_LABEL: Record<QlooMethod, string> = {
   searchEntity: "GET /search",
   findTags: "GET /v2/tags",
-  heatmapForCity: "GET /v2/insights?filter.type=urn:heatmap",
+  heatmapForCities: "GET /v2/insights?filter.type=urn:heatmap&filter.location=<region polygon>",
   demographics: "GET /v2/insights?filter.type=urn:demographics",
   trending: "GET /v2/trending",
   relatedActs: "GET /v2/insights?filter.type=[act type]",
@@ -190,8 +191,10 @@ export interface RunState {
   venueTags: TagRef[];
   venueTagsTried: boolean;
   heatmaps: Map<string, HeatmapEntry>;
-  /** Cities whose act-seeded heatmap came back empty. */
+  /** Cities whose act-seeded heatmap row came back with no cells in reach. */
   thinCities: Set<string>;
+  /** Cells returned by the last act-seeded region heatmap (before assignment to cities). */
+  regionCells?: number;
   candidates?: CityScore[];
   globalDemographics?: { data: DemographicsData; status: ToolStatus };
   cityDemographics: Map<string, Demographics>;
@@ -235,6 +238,11 @@ export interface RunContext {
   qloo: QlooClient;
   /** Candidate pool for the region with excluded cities already removed. */
   pool: CityPoolEntry[];
+  /**
+   * The region's full pool, exclusions included. The act-seeded heatmap polygon is built from it so normalization
+   * (and the request's cache key) stays the same however the user locks or drops cities. Defaults to `pool`.
+   */
+  regionPool?: CityPoolEntry[];
   tracer: Tracer;
   state: RunState;
   emit: (e: PlanEvent) => void;
@@ -435,38 +443,79 @@ export function defaultVenueQueries(type: ActType): string[] {
   return ["live music venue", "cocktail bar", "record store"];
 }
 
-export async function probeCities(ctx: RunContext, cityIds: string[], seed: "act" | "tags") {
+/** Per-city status from the region envelope: a city with no cells in reach is "empty" (thin) whatever the envelope says. */
+function cityStatus(envelope: ToolStatus, cells: number): ToolStatus {
+  if (envelope === "error") return "error";
+  if (cells === 0) return "empty";
+  // "partial" and "empty" describe other cities in the region; this one has cells.
+  return envelope === "partial" || envelope === "empty" ? "ok" : envelope;
+}
+
+/**
+ * One region-wide heatmap, cut up by city (heatmapForCities). Qloo rank-normalizes each query, so only cities from
+ * the same query are comparable; an act-seeded probe therefore always sends the whole region pool, whatever ids were
+ * asked for, and records every pool city (`only` restricts recording to the requested ids, for revisions that must
+ * keep their parent's candidate field). The tag-seeded re-probe sends just the requested (thin) cities.
+ */
+export async function probeCities(ctx: RunContext, cityIds: string[], seed: "act" | "tags", opts: { only?: boolean } = {}) {
   await ensureAct(ctx);
-  const cities = cityIds.map((id) => findCity(ctx, id)).filter((c): c is CityPoolEntry => Boolean(c));
+  const requested = [...new Map(cityIds.map((id) => findCity(ctx, id)).filter((c): c is CityPoolEntry => Boolean(c)).map((c) => [c.id, c])).values()];
   const unknown = cityIds.filter((id) => !findCity(ctx, id));
   const useTags = seed === "tags" || !hasEntity(ctx);
   if (useTags) await ensureSeedTags(ctx);
   ctx.tracer.begin("score", "Score cities");
   const seedArg = useTags ? { tagIds: ctx.state.seedTags.map((t) => t.id) } : actSeed(ctx);
   const noSeedTags = useTags && ctx.state.seedTags.length === 0;
-  const results = await mapLimit(cities, 4, async (city) => {
-    const empty: CityHeatmap = { city, affinity: 0, affinityRank: 0, popularity: 0, cells: [] };
-    const prev = ctx.state.heatmaps.get(city.id);
-    if (noSeedTags) {
-      // Nothing to re-seed with: record the attempt so the guard does not loop, keep any usable earlier result.
-      if (!prev || !okish(prev.status)) ctx.state.heatmaps.set(city.id, { heatmap: prev?.heatmap ?? empty, status: "empty", seed: "tags" });
-      return { cityId: city.id, status: "empty" as ToolStatus, affinity: 0, popularity: 0 };
+  const regionWide = seed === "act";
+  const query = regionWide ? (ctx.regionPool?.length ? ctx.regionPool : ctx.pool) : requested;
+  const recordCities = regionWide && !opts.only ? ctx.pool : requested;
+  const empty = (city: CityPoolEntry): CityHeatmap => ({ city, affinity: 0, affinityRank: 0, popularity: 0, cells: [] });
+  const statusBy = new Map<string, ToolStatus>();
+  let cellCount = 0;
+
+  if (noSeedTags || query.length === 0) {
+    // Nothing to seed with: record the attempt so the guard does not loop, keep any usable earlier result.
+    for (const city of recordCities) {
+      const prev = ctx.state.heatmaps.get(city.id);
+      if (!prev || !okish(prev.status)) ctx.state.heatmaps.set(city.id, { heatmap: prev?.heatmap ?? empty(city), status: "empty", seed: "tags" });
+      statusBy.set(city.id, "empty");
     }
-    const res = await q(ctx, "score", "heatmapForCity", empty, () => ctx.qloo.heatmapForCity(seedArg, city));
-    const data: CityHeatmap = { ...empty, ...res.data, city };
-    if (!useTags) {
-      if (res.status === "empty") ctx.state.thinCities.add(city.id);
-      const replace = !prev || prev.seed === "act" || okish(res.status) || !okish(prev.status);
-      if (replace) ctx.state.heatmaps.set(city.id, { heatmap: data, status: res.status, seed: "act" });
-    } else {
-      const status: ToolStatus = okish(res.status) ? "degraded" : res.status;
-      if (!prev || !okish(prev.status)) ctx.state.heatmaps.set(city.id, { heatmap: data, status, seed: "tags" });
-      if (okish(res.status)) ctx.tracer.mark("score", "degraded");
+  } else {
+    const fallback: RegionHeatmap = { region: ctx.input.region, polygon: "", cellCount: 0, cities: [] };
+    const res = await q(ctx, "score", "heatmapForCities", fallback, () => ctx.qloo.heatmapForCities(seedArg, query, ctx.input.region));
+    cellCount = res.data.cellCount ?? 0;
+    const rows = new Map((res.data.cities ?? []).filter((r) => r?.city).map((r) => [r.city.id, r]));
+    let anyOk = false;
+    for (const city of recordCities) {
+      const row = rows.get(city.id);
+      const data: CityHeatmap = { ...empty(city), ...row, city, cells: row?.cells ?? [] };
+      const status = cityStatus(res.status, data.cells.length);
+      const prev = ctx.state.heatmaps.get(city.id);
+      if (!useTags) {
+        if (status === "empty") ctx.state.thinCities.add(city.id);
+        const replace = !prev || prev.seed === "act" || okish(status) || !okish(prev.status);
+        if (replace) ctx.state.heatmaps.set(city.id, { heatmap: data, status, seed: "act" });
+      } else {
+        const tagStatus: ToolStatus = okish(status) ? "degraded" : status;
+        if (!prev || !okish(prev.status)) ctx.state.heatmaps.set(city.id, { heatmap: data, status: tagStatus, seed: "tags" });
+        anyOk ||= okish(status);
+      }
+      statusBy.set(city.id, status);
     }
-    return { cityId: city.id, status: res.status, affinity: r2(data.affinity), popularity: r2(data.popularity) };
+    if (!useTags) ctx.state.regionCells = cellCount;
+    if (anyOk) ctx.tracer.mark("score", "degraded");
+  }
+
+  const results = requested.map((city) => {
+    const h = ctx.state.heatmaps.get(city.id)?.heatmap;
+    return { cityId: city.id, status: statusBy.get(city.id) ?? ("empty" as ToolStatus), affinity: r2(h?.affinity), popularity: r2(h?.popularity) };
   });
-  ctx.tracer.end("score", `heatmap ×${ctx.state.heatmaps.size}${ctx.state.thinCities.size ? `, ${ctx.state.thinCities.size} thin` : ""}`, `Score ${ctx.state.heatmaps.size} cities`);
-  return { results, unknown, seed: useTags ? "tags" : "act" };
+  const thin = ctx.state.thinCities.size;
+  const summary = regionWide
+    ? `one region heatmap, ${cellCount} cells, ${recordCities.length} cities${thin ? `, ${thin} thin` : ""}`
+    : `tag-seeded heatmap for ${requested.length} thin ${requested.length === 1 ? "city" : "cities"}, ${cellCount} cells`;
+  ctx.tracer.end("score", summary, `Score ${ctx.state.heatmaps.size} cities`);
+  return { results, unknown, seed: useTags ? "tags" : "act", cells: cellCount, recorded: recordCities.length };
 }
 
 /** Cities whose act seed was empty and that have not been re-seeded by tags yet. */
@@ -485,11 +534,29 @@ export function score(ctx: RunContext): CityScore[] {
   ctx.emit({ type: "candidates", candidates: ctx.state.candidates });
   const untapped = ctx.state.candidates.filter((c) => c.quadrant === "untapped").length;
   const step = ctx.tracer.get("score");
-  ctx.tracer.end("score", `heatmap ×${rows.length}; ${untapped} provisional higher-affinity/lower-popularity candidates; cross-city comparability unverified${step?.status === "degraded" ? "; thin cities re-seeded by taste tags" : ""}`, `Score ${rows.length} cities`);
+  const cells = ctx.state.regionCells !== undefined ? `one region heatmap, ${ctx.state.regionCells} cells, ${rows.length} cities` : `${rows.length} cities`;
+  ctx.tracer.end(
+    "score",
+    `${cells}; ${untapped} primed-and-less-known ${untapped === 1 ? "candidate" : "candidates"}${step?.status === "degraded" ? "; thin cities re-seeded by taste tags" : ""}`,
+    `Score ${rows.length} cities`,
+  );
   return ctx.state.candidates;
 }
 
-export async function fetchMomentum(ctx: RunContext, weeks = 8): Promise<Momentum> {
+/**
+ * Momentum in words. Qloo's trending series came back flat (velocity 0) for every act probed on key day, so a flat
+ * zero-velocity series is "no movement in Qloo's series", never a measured steady trend.
+ */
+export function momentumPhrase(m: Pick<Momentum, "trend" | "velocity"> | undefined): string {
+  if (!m || m.trend === "unknown") return "no trending data";
+  if (m.trend === "flat" && !m.velocity) return "no movement in Qloo's series";
+  return m.trend;
+}
+
+/** Qloo returns no trending rows for windows under about 26 weeks (key day, 2026-10-14). */
+export const MIN_TRENDING_WEEKS = 26;
+
+export async function fetchMomentum(ctx: RunContext, weeks = MIN_TRENDING_WEEKS): Promise<Momentum> {
   const act = await ensureAct(ctx);
   ctx.tracer.begin("momentum", "Check momentum");
   if (!hasEntity(ctx)) {
@@ -499,7 +566,7 @@ export async function fetchMomentum(ctx: RunContext, weeks = 8): Promise<Momentu
     ctx.state.momentum = { trend: res.data.trend ?? "unknown", velocity: r2(res.data.velocity), weeks: res.data.weeks ?? weeks, status: res.status };
   }
   ctx.emit({ type: "momentum", momentum: ctx.state.momentum });
-  ctx.tracer.end("momentum", `trending ${ctx.state.momentum.weeks ?? weeks} weeks: ${ctx.state.momentum.trend}`);
+  ctx.tracer.end("momentum", `trending ${ctx.state.momentum.weeks ?? weeks} weeks: ${momentumPhrase(ctx.state.momentum)}`);
   return ctx.state.momentum;
 }
 
@@ -728,7 +795,7 @@ export function createAgentTools(ctx: RunContext, track: <T>(p: Promise<T>) => P
     ),
     spec(
       "probeCities",
-      'Qloo heatmap insights for each city id from the pool: affinity (0..1, how much local taste aligns with the act) and popularity (0..1, how known the act already is there). seed "act" uses the act entity; seed "tags" uses the seed tags (thin-data fallback).',
+      'Qloo heatmap insights: affinity (0..1, how much local taste aligns with the act) and popularity (0..1, how known the act already is there). seed "act" runs ONE region-wide heatmap query covering the whole pool (values comparable across the region) and scores every pool city; results list the ids you passed. seed "tags" re-probes just the given thin cities with the seed tags (thin-data fallback).',
       z.object({ cityIds, seed: z.enum(["act", "tags"]).default("act") }),
       async ({ cityIds: ids, seed }) => {
         const r = await probeCities(ctx, ids, seed);
@@ -747,7 +814,12 @@ export function createAgentTools(ctx: RunContext, track: <T>(p: Promise<T>) => P
         candidates: rows.map((c) => ({ id: c.id, affinity: c.affinity, popularity: c.popularity, underserved: c.underserved, quadrant: c.quadrant, rank: c.affinityRank, status: c.status })),
       };
     }),
-    spec("getMomentum", "Qloo /v2/trending for the act: rising, flat or falling.", z.object({ weeks: z.number().int().min(4).max(26).optional() }), async ({ weeks }) => fetchMomentum(ctx, weeks)),
+    spec(
+      "getMomentum",
+      "Qloo /v2/trending for the act: rising, flat or falling. A flat series with velocity 0 means no movement in Qloo's series, not a measured trend.",
+      z.object({ weeks: z.number().int().min(MIN_TRENDING_WEEKS).max(52).optional() }),
+      async ({ weeks }) => fetchMomentum(ctx, weeks),
+    ),
     spec(
       "getDemographics",
       "Qloo demographics insights: the act's overall audience age and gender scores vs baseline. These are act-wide, not local audience measurements.",

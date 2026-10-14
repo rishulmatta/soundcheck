@@ -14,7 +14,7 @@ import { nanoid } from "nanoid";
 import { getQloo, type QlooClient, type RelatedEntity } from "@/lib/qloo";
 import { putPlan } from "@/lib/store";
 import { fetchActProfile, type ActProfile } from "@/lib/actProfile";
-import { Plan, PlanInput, type ActType, type ChangeSet, type CityPoolEntry, type CityScore, type Demographics, type Momentum, type Pick as PickT, type PlanEvent, type Stop, type ToolStatus, type TraceStep } from "@/lib/types";
+import { Plan, PlanInput, type ActType, type PlanProvenance, type ChangeSet, type CityPoolEntry, type CityScore, type Demographics, type Momentum, type Pick as PickT, type PlanEvent, type Stop, type ToolStatus, type TraceStep } from "@/lib/types";
 import { matchesCity } from "@/lib/routing";
 import { isReorderOnly, reorderStops } from "@/lib/revision";
 import { suggestCapacity } from "@/lib/economics";
@@ -37,6 +37,7 @@ import {
   findVenueTags,
   finalizeStop,
   mapLimit,
+  momentumPhrase,
   newRunState,
   pendingThinCities,
   probeCities,
@@ -139,9 +140,11 @@ async function ensureCoverage(ctx: RunContext, mark: (item: CoverageItem, detail
     mark("tasteTags", "fetched the taste profile");
   }
 
-  // Heatmaps: every locked city, plus enough of the pool spread across the region. With nothing probed at all
-  // (no model, or the model never got there) the whole pool is probed so the quadrant chart is complete.
-  const want = state.heatmaps.size === 0 ? ctx.pool.length : minProbe(input, ctx.pool.length);
+  // Heatmaps: every locked city, plus enough of the pool spread across the region. An act-seeded probe is one
+  // region-wide query that scores the whole pool, so with nothing probed yet (no model, or the model never got there)
+  // the first probe completes the quadrant chart. Topping up an existing field (a revision) records only what it asks for.
+  const fresh = state.heatmaps.size === 0;
+  const want = fresh ? ctx.pool.length : minProbe(input, ctx.pool.length);
   const lockedIds = ctx.pool.filter((c) => input.lockedCities.some((k) => matchesCity(c, k))).map((c) => c.id);
   const lockedMissing = lockedIds.filter((id) => !state.heatmaps.has(id));
   const unprobed = ctx.pool.map((c) => c.id).filter((id) => !state.heatmaps.has(id) && !lockedIds.includes(id));
@@ -149,8 +152,8 @@ async function ensureCoverage(ctx: RunContext, mark: (item: CoverageItem, detail
   const toProbe = [...lockedMissing, ...spreadPick(unprobed, deficit)];
   let heatmapsChanged = false;
   if (toProbe.length) {
-    await probeCities(ctx, toProbe, "act");
-    mark("heatmap", `probed ${toProbe.length} more cities`);
+    await probeCities(ctx, toProbe, "act", { only: !fresh });
+    mark("heatmap", fresh ? `probed the region pool (${state.heatmaps.size} cities) in one heatmap` : `probed ${toProbe.length} more cities`);
     heatmapsChanged = true;
   }
   const thin = pendingThinCities(ctx);
@@ -165,10 +168,12 @@ async function ensureCoverage(ctx: RunContext, mark: (item: CoverageItem, detail
     await fetchMomentum(ctx);
     mark("trending", "checked momentum");
   }
-  if (!state.route || heatmapsChanged) {
+  // The brief asks for exactly input.stops cities; a model route of another length is re-routed to the request.
+  const wrongLength = state.route !== undefined && state.route.order.length < Math.min(input.stops, state.candidates?.length ?? 0);
+  if (!state.route || heatmapsChanged || wrongLength) {
     const hadRoute = Boolean(state.route);
     route(ctx);
-    mark("route", hadRoute ? "re-routed after adding heatmaps" : "routed the tour");
+    mark("route", !hadRoute ? "routed the tour" : heatmapsChanged ? "re-routed after adding heatmaps" : `re-routed to the requested ${input.stops} stops`);
   }
   const stopIds = state.route!.order.map((c) => c.id);
 
@@ -241,10 +246,12 @@ function defaultPicks(ctx: RunContext, cityId: string) {
 /* ---------------------------------------------------------- stop assembly */
 
 const QUADRANT_LABEL: Record<CityScore["quadrant"], string> = {
-  untapped: "high-affinity, lower-popularity candidate",
-  established: "high-affinity, higher-popularity candidate",
-  reach: "lower-affinity candidate",
+  untapped: "primed, less known than its fit suggests",
+  established: "primed and already known",
+  reach: "lower affinity",
 };
+
+type Comparability = PlanProvenance["heatmapComparability"];
 
 /** Announce lead time in weeks: untapped markets need a longer runway; momentum shortens or lengthens it. */
 export function announceWeeks(quadrant: CityScore["quadrant"], trend: Momentum["trend"]): [number, number] {
@@ -308,6 +315,8 @@ export function copyFacts(ctx: RunContext, city: CityScore, legDays: number, dem
   const cands = state.candidates ?? [];
   const trend = state.momentum?.trend ?? "unknown";
   const [w1, w2] = announceWeeks(city.quadrant, trend);
+  // Same source as the plan's provenance: live data is region-normalized, mock/unknown stays unverified.
+  const heatmapComparability = createProvenance(ctx.qloo.mode ?? "unknown").heatmapComparability;
   return {
     act: act.name,
     actType: act.type,
@@ -315,13 +324,13 @@ export function copyFacts(ctx: RunContext, city: CityScore, legDays: number, dem
     country: city.country,
     qloo: {
       dataMode: ctx.qloo.mode ?? "unknown",
-      heatmapComparability: "unverified",
+      heatmapComparability,
       demographicsScope: "act-wide",
       affinity: city.affinity,
       popularity: city.popularity,
       topAgeBuckets: topAgeBuckets(demo),
       femaleScoreVsBaseline: demo.gender.female,
-      momentum: trend,
+      momentum: momentumPhrase(state.momentum),
     },
     soundcheck: {
       heuristicRank: city.affinityRank,
@@ -337,7 +346,7 @@ export function copyFacts(ctx: RunContext, city: CityScore, legDays: number, dem
       travelDaysFromPreviousStop: legDays,
     },
     window: input.window,
-    writing: { stopOrder: order, leadWith: leadAngle(order, demo, trend, legDays) },
+    writing: { stopOrder: order, leadWith: leadAngle(order, demo, trend, legDays, heatmapComparability) },
   };
 }
 
@@ -345,9 +354,14 @@ export function copyFacts(ctx: RunContext, city: CityScore, legDays: number, dem
  * The evidence each stop's whyHere sentence opens with. Copy is written one stop at a time, so without this every
  * sentence lands on the same template. Picks only angles the facts can support, rotating by tour order.
  */
-export function leadAngle(order: number, demo: Demographics, trend: string, legDays: number): string {
-  const angles: string[] = ["recorded affinity and popularity; cross-city comparability is unverified"];
+export function leadAngle(order: number, demo: Demographics, trend: string, legDays: number, comparability: Comparability = "unverified"): string {
+  const angles: string[] = [
+    comparability === "region-normalized"
+      ? "affinity and popularity from one region-wide Qloo heatmap, comparable with the other cities in this plan"
+      : "recorded affinity and popularity; cross-city comparability is unverified",
+  ];
   if (topAgeBuckets(demo).length) angles.push("the act-wide age buckets that over-index (not a local audience profile)");
+  // A flat series (velocity 0 for every act probed so far) is no movement in Qloo's series: not an angle.
   if (trend === "rising" || trend === "falling") angles.push("momentum");
   if (legDays > 0) angles.push("the travel days from the previous stop and why the routing works");
   angles.push("provisional heuristic selection; affinity and popularity are separate indices");
@@ -358,10 +372,10 @@ type Facts = ReturnType<typeof copyFacts>;
 
 export function templateCopy(f: Facts): StopCopy {
   const cap = f.soundcheck.suggestedCapacity.toLocaleString("en-US");
-  return {
-    suggestion: `Room-size assumption: ${cap} capacity; validate demand before booking.`,
-    whyHere: `${f.qloo.dataMode === "mock" ? "Synthetic example" : "Provisional heuristic candidate"}: ${f.city} has recorded affinity ${f.qloo.affinity} and popularity ${f.qloo.popularity}; cross-city comparability is unverified.`,
-  };
+  const whyHere = f.qloo.heatmapComparability === "region-normalized"
+    ? `Research lead: ${f.city} has affinity ${f.qloo.affinity} and popularity ${f.qloo.popularity} in one region-wide Qloo heatmap; not evidence of ticket demand or booking history.`
+    : `${f.qloo.dataMode === "mock" ? "Synthetic example" : "Provisional heuristic candidate"}: ${f.city} has recorded affinity ${f.qloo.affinity} and popularity ${f.qloo.popularity}; cross-city comparability is unverified.`;
+  return { suggestion: `Room-size assumption: ${cap} capacity; validate demand before booking.`, whyHere };
 }
 
 /** Every number in the text, thousands separators removed. */
@@ -379,11 +393,18 @@ export function copyUsesOnlyGivenNumbers(copy: StopCopy, facts: Facts): boolean 
   return numbersIn(`${copy.suggestion} ${copy.whyHere}`).every((n) => allowed.has(n));
 }
 
-/** A numeric whitelist cannot validate claims: require explicit limits and reject known unsupported interpretations. */
-export function copyMeetsEvidenceLimits(copy: StopCopy): boolean {
+/**
+ * A numeric whitelist cannot validate claims: require explicit limits and reject known unsupported interpretations.
+ * Unverified (mock/unknown) facts must say "unverified". Region-normalized (live) facts must instead name the
+ * region-wide Qloo heatmap as the source and frame the city as a lead to investigate.
+ */
+export function copyMeetsEvidenceLimits(copy: StopCopy, comparability: Comparability = "unverified"): boolean {
   const text = `${copy.suggestion} ${copy.whyHere}`;
-  return /assumption/i.test(copy.suggestion) && /unverified/i.test(copy.whyHere) &&
-    !/\b(?:audience overlap|fan(?:base)? overlap|median|sold out|sells? \d|nobody (?:has )?(?:played|booked)|guaranteed)\b/i.test(text);
+  const limits = comparability === "region-normalized"
+    ? /region(?:-|\s)?wide/i.test(copy.whyHere) && /heatmap/i.test(copy.whyHere) && /\b(?:lead|investigat\w*|research|worth checking)\b/i.test(copy.whyHere)
+    : /unverified/i.test(copy.whyHere);
+  return /assumption/i.test(copy.suggestion) && limits &&
+    !/\b(?:audience overlap|fan(?:base)? overlap|median|sold out|sells? \d|will sell|proven demand|nobody (?:has )?(?:played|booked)|guaranteed)\b/i.test(text);
 }
 
 /* -------------------------------------------------------------------- run */
@@ -519,7 +540,7 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
   const reusableBaseline = baseline && provenanceFor(baseline).dataMode === qloo.mode ? baseline : undefined;
   const excluded = (c: CityPoolEntry) => input.excludedCities.some((k) => matchesCity(c, k));
   const tracer = new Tracer(emit, deps.now);
-  const ctx: RunContext = { input, qloo, pool: deps.pool.filter((c) => !excluded(c)), tracer, state: newRunState(), emit, profile: deps.profile };
+  const ctx: RunContext = { input, qloo, pool: deps.pool.filter((c) => !excluded(c)), regionPool: deps.pool, tracer, state: newRunState(), emit, profile: deps.profile };
   const meter = deps.model ? new UsageMeter(deps.model.id, promptCacheEnabled()) : undefined;
 
   if (reusableBaseline) {
@@ -529,7 +550,8 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
     // Re-score the parent's candidate cities (plus any restored or locked city it never scored) rather than the whole
     // pool: the same field keeps the route stable apart from the requested change, and every probe is a cache hit.
     const field = revisionField(ctx, reusableBaseline);
-    if (field.length) await probeCities(ctx, field, "act");
+    // `only`: the region-wide query still covers the whole pool (same polygon, a cache hit), but only the field is scored.
+    if (field.length) await probeCities(ctx, field, "act", { only: true });
     tracer.end(
       "agent",
       `Revision of ${reusableBaseline.id}${opts.revisionNote ? `: ${opts.revisionNote}` : ""}. Constraints applied by the orchestrator; Qloo answers reused from cache; ${carried}; ${field.length} cities re-scored`,
@@ -619,7 +641,7 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
         try {
           const signal = opts.signal ? AbortSignal.any([AbortSignal.timeout(30_000), opts.signal]) : AbortSignal.timeout(30_000);
           const c = await deps.model.writeStopCopy(facts, signal, meter);
-          if (copyUsesOnlyGivenNumbers(c, facts) && copyMeetsEvidenceLimits(c)) {
+          if (copyUsesOnlyGivenNumbers(c, facts) && copyMeetsEvidenceLimits(c, facts.qloo.heatmapComparability)) {
             copy = c;
             modelCopies++;
           }

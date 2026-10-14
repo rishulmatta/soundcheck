@@ -1,4 +1,5 @@
-import type { CityScore } from "@/lib/types";
+import type { CityScore, PlanProvenance } from "@/lib/types";
+import { AFFINITY_GATE, UNTAPPED_GAP } from "@/lib/score";
 
 const W = 200;
 const H = 148;
@@ -13,8 +14,21 @@ const dotColor: Record<CityScore["quadrant"], string> = {
 /**
  * A 200px affinity-against-popularity scatter of every candidate, with the current city ringed.
  * Pure SVG: the ring glides between dots with a CSS transform transition (see .tq-ring in tour.css).
+ * "region-normalized" plans draw the scorer's boundaries (affinity gate plus the affinity = popularity + gap diagonal);
+ * "unverified" plans (the saved demos) keep the split read from their classification.
  */
-export function MiniQuadrant({ candidates, currentId, className }: { candidates: CityScore[]; currentId?: string; className?: string }) {
+export function MiniQuadrant({
+  candidates,
+  currentId,
+  comparability = "unverified",
+  className,
+}: {
+  candidates: CityScore[];
+  currentId?: string;
+  comparability?: PlanProvenance["heatmapComparability"];
+  className?: string;
+}) {
+  const diagonal = comparability === "region-normalized";
   const affs = candidates.map((c) => c.affinity);
   const lo = Math.max(0, Math.min(...affs, 0.4) - 0.05);
   const hi = 1;
@@ -27,6 +41,12 @@ export function MiniQuadrant({ candidates, currentId, className }: { candidates:
   const splitAff = reach.length && strong.length ? (Math.max(...reach) + Math.min(...strong)) / 2 : (lo + hi) / 2;
   const splitX = x(0.5);
   const splitY = y(splitAff);
+
+  // Region-normalized: untapped sits above the gate and left of the diagonal, which runs from the gate to the top edge.
+  const gateY = y(AFFINITY_GATE);
+  const diagStart = { x: x(AFFINITY_GATE - UNTAPPED_GAP), y: gateY };
+  const diagEnd = { x: x(hi - UNTAPPED_GAP), y: y(hi) };
+  const untappedArea = [[PAD.l, gateY], [diagStart.x, diagStart.y], [diagEnd.x, diagEnd.y], [PAD.l, y(hi)]].map((p) => p.join(",")).join(" ");
 
   const current = candidates.find((c) => c.id === currentId);
   const cx = current ? x(current.popularity) : 0;
@@ -42,13 +62,26 @@ export function MiniQuadrant({ candidates, currentId, className }: { candidates:
       role="img"
       aria-label={`Affinity against popularity for ${candidates.length} candidate cities${current ? `, ${current.name} highlighted` : ""}`}
     >
-      <rect x={PAD.l} y={PAD.t} width={splitX - PAD.l} height={splitY - PAD.t} fill="var(--signal-soft)" />
+      {diagonal ? (
+        <polygon points={untappedArea} fill="var(--signal-soft)" />
+      ) : (
+        <rect x={PAD.l} y={PAD.t} width={splitX - PAD.l} height={splitY - PAD.t} fill="var(--signal-soft)" />
+      )}
       <line x1={PAD.l} y1={H - PAD.b} x2={W - PAD.r} y2={H - PAD.b} stroke="var(--line-strong)" />
       <line x1={PAD.l} y1={PAD.t} x2={PAD.l} y2={H - PAD.b} stroke="var(--line-strong)" />
-      <line x1={splitX} y1={PAD.t} x2={splitX} y2={H - PAD.b} stroke="var(--line)" strokeDasharray="3 3" />
-      <line x1={PAD.l} y1={splitY} x2={W - PAD.r} y2={splitY} stroke="var(--line)" strokeDasharray="3 3" />
+      {diagonal ? (
+        <>
+          <line x1={PAD.l} y1={gateY} x2={W - PAD.r} y2={gateY} stroke="var(--line)" strokeDasharray="3 3" />
+          <line x1={diagStart.x} y1={diagStart.y} x2={diagEnd.x} y2={diagEnd.y} stroke="var(--line)" strokeDasharray="3 3" />
+        </>
+      ) : (
+        <>
+          <line x1={splitX} y1={PAD.t} x2={splitX} y2={H - PAD.b} stroke="var(--line)" strokeDasharray="3 3" />
+          <line x1={PAD.l} y1={splitY} x2={W - PAD.r} y2={splitY} stroke="var(--line)" strokeDasharray="3 3" />
+        </>
+      )}
       <text x={PAD.l + 4} y={PAD.t + 11} fill="var(--signal)" fontSize="8" fontWeight="600" letterSpacing="0.08em">
-        INVESTIGATE · PROVISIONAL
+        {diagonal ? "INVESTIGATE" : "INVESTIGATE · PROVISIONAL"}
       </text>
       <text x={W - PAD.r} y={H - 4} textAnchor="end" fill="var(--ink-muted)" fontSize="9" style={{ fontFamily: "var(--font-plex-mono), ui-monospace, monospace" }}>
         popularity →

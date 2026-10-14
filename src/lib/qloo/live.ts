@@ -4,20 +4,21 @@
  * Every method returns a ToolResult envelope and never throws:
  *  - ok        200 with results
  *  - empty     200 with no results, or a 400 the API rejected (e.g. "no locality found"); meta.note says which
- *  - partial   fewer items than requested, or the matched locality looks like the wrong city
+ *  - partial   fewer items than requested, or some requested cities got no heatmap cells
  *  - degraded  results came from a fallback (tag seed instead of the act, no location, no tag filter, ...)
  *  - error     network failure, timeout, 401/403/404, or 429/5xx after retries
  *
  * Parameter names are quoted from docs.qloo.com (parameters, available-parameters-by-entity-type, heatmaps-use-case,
  * demographics-use-case, taste-analysis, get-search, search-tags, get-trending, analysis-compare).
  */
-import type { ActType, CityPoolEntry, ToolResult, ToolStatus } from "@/lib/types";
+import type { ActType, CityPoolEntry, Region, ToolResult, ToolStatus } from "@/lib/types";
+import { CITY_CELL_RADIUS_KM, regionPolygonWkt } from "@/lib/geo";
 import type {
-  CityHeatmap,
   CompareData,
   DemographicsData,
   EntityCandidate,
   QlooClient,
+  RegionHeatmap,
   RelatedEntity,
   TagRef,
   TrendingData,
@@ -25,11 +26,11 @@ import type {
 import { QlooHttpClient, type QlooHttpOptions, type QlooRequest } from "./client";
 import type { RedactContext } from "./redact";
 import {
-  toCityHeatmap,
   toCompare,
   toDemographics,
   toEntityCandidate,
   toEntityList,
+  toRegionHeatmap,
   toRelatedEntity,
   toSearchList,
   toTagRefs,
@@ -63,29 +64,6 @@ export const SEARCH_TYPE: Record<ActType, string> = {
 
 // ---------- locality queries ----------
 
-const COUNTRY_NAMES: Record<string, string[]> = {
-  US: ["United States"],
-  CA: ["Canada"],
-  GB: ["United Kingdom", "England", "Scotland", "Wales", "Northern Ireland"],
-  IE: ["Ireland"],
-  PT: ["Portugal"],
-  ES: ["Spain"],
-  FR: ["France"],
-  BE: ["Belgium"],
-  NL: ["Netherlands"],
-  DE: ["Germany"],
-  DK: ["Denmark"],
-  SE: ["Sweden"],
-  NO: ["Norway"],
-  FI: ["Finland"],
-  PL: ["Poland"],
-  CZ: ["Czech", "Czechia"],
-  AT: ["Austria"],
-  HU: ["Hungary"],
-  CH: ["Switzerland"],
-  IT: ["Italy"],
-};
-
 /**
  * City names that collide with other localities. The locality docs show comma-qualified queries such as
  * "Garden City, New York", so we qualify these up front. Everything else is sent as the bare city name.
@@ -104,19 +82,6 @@ const LOCATION_QUERY_OVERRIDES: Record<string, string> = {
 
 export function locationQueryFor(city: CityPoolEntry): string {
   return LOCATION_QUERY_OVERRIDES[city.id] ?? city.name;
-}
-
-function qualifiedQuery(city: CityPoolEntry): string {
-  const country = COUNTRY_NAMES[city.country]?.[0] ?? city.country;
-  return `${city.name}, ${country}`;
-}
-
-function localityMatchesCountry(city: CityPoolEntry, disambiguation?: string): boolean {
-  if (!disambiguation) return true; // nothing to check against
-  const names = COUNTRY_NAMES[city.country];
-  if (!names) return true;
-  const d = disambiguation.toLowerCase();
-  return names.some((n) => d.includes(n.toLowerCase()));
 }
 
 // ---------- request builders (also used by the mock so traces match) ----------
@@ -153,18 +118,20 @@ export const qlooRequests = {
     };
   },
   /**
-   * GET /v2/insights?filter.type=urn:heatmap&filter.location.query=&signal.interests.entities|tags= (heatmaps-use-case).
-   * take=50 (documented max) since the heatmap table lists `take`; whether it caps cells is a key-day check.
+   * GET /v2/insights?filter.type=urn:heatmap&filter.location=<WKT polygon>&signal.interests.entities|tags=
+   * (heatmaps-use-case). Key day (2026-10-14): a per-city `filter.location.query` heatmap rank-normalizes affinity and
+   * popularity within that one query (every city spans 0..1, mean 0.5), so cities cannot be compared. One polygon
+   * query is normalized over the whole region, which makes cities comparable. Cells are geohash-4. `take` does not
+   * cap cells, so it is not sent; `output.heatmap.boundary` returned HTTP 500, so it is not sent either.
    */
-  heatmap(seed: Seed, locationQuery: string): QlooRequest {
+  heatmap(seed: Seed, polygon: string): QlooRequest {
     return {
       path: "/v2/insights",
       params: {
         "filter.type": "urn:heatmap",
-        "filter.location.query": locationQuery,
+        "filter.location": polygon,
         "signal.interests.entities": seed.entityIds,
         "signal.interests.tags": seed.tagIds,
-        take: 50,
       },
     };
   },
@@ -179,7 +146,12 @@ export const qlooRequests = {
       },
     };
   },
-  /** GET /v2/trending?filter.type=&signal.interests.entities=&filter.start_date=&filter.end_date= (get-trending; all four required). */
+  /**
+   * GET /v2/trending?filter.type=&signal.interests.entities=&filter.start_date=&filter.end_date= (get-trending; all four
+   * required). Key day (2026-10-14): windows under about 26 weeks return zero rows live whatever `take` is; 26 weeks gave
+   * 29 rows, 40 and 52 gave 50 (the take cap). Rows came back flat (velocity 0) for every act probed. Above 20 weeks
+   * we send take = min(50, weeks) so the default page size does not truncate the series.
+   */
   trending(entityId: string, type: ActType, weeks: number, now?: Date): QlooRequest {
     const { start, end } = trendingWindow(weeks, now);
     return {
@@ -279,7 +251,7 @@ interface Parsed<T> {
   /** Requested item count; fewer returned → "partial". */
   requested?: number;
   note?: string;
-  /** Force a status for a data-bearing response (e.g. "partial" on a locality mismatch). */
+  /** Force a status for a data-bearing response (e.g. "partial" when some cities got no cells). */
   status?: ToolStatus;
 }
 
@@ -387,59 +359,42 @@ export class LiveQlooClient implements QlooClient {
     return result;
   }
 
-  async heatmapForCity(seed: Seed, city: CityPoolEntry): Promise<ToolResult<CityHeatmap>> {
-    const emptyData: CityHeatmap = { city, affinity: 0, affinityRank: 0, popularity: 0, cells: [] };
-    const actIds = seed.entityIds ?? [];
-    const run = (locationQuery: string) => {
-      const steps: Step[] = [];
-      if (seed.entityIds?.length) steps.push({ req: qlooRequests.heatmap({ entityIds: seed.entityIds }, locationQuery) });
-      if (seed.tagIds?.length)
-        steps.push({ req: qlooRequests.heatmap({ tagIds: seed.tagIds }, locationQuery), fallbackNote: "seeded by genre/taste tags, not the act" });
-      return this.ladder<CityHeatmap>(
-        steps,
-        (body) => {
-          const parsed = toCityHeatmap(body, city);
-          if (!parsed) return undefined;
-          const matches = localityMatchesCountry(city, parsed.locality?.disambiguation);
-          const notes: string[] = [];
-          if (parsed.locality?.disambiguation) notes.push(`locality: ${parsed.locality.disambiguation}`);
-          notes.push("Cross-city heatmap comparability is unverified; market ranks and categories are provisional heuristics");
-          if (parsed.normalizedWithinCity) notes.push("cell affinity looks normalized within the city");
-          return {
-            data: parsed.heatmap,
-            count: parsed.heatmap.cells.length,
-            note: notes.join("; ") || undefined,
-            status: matches ? undefined : "partial",
-          };
-        },
-        emptyData,
-        { actIds },
-      );
-    };
-
+  /**
+   * One heatmap query for the bounding polygon of `cities`, cells assigned to each city by proximity
+   * (CITY_CELL_RADIUS_KM). The polygon, and therefore Qloo's normalization, depends on the city set passed in, so
+   * values from calls with different city sets are not comparable; the agent layer passes the whole region pool.
+   * Ladder: act-seeded first, tag-seeded as the fallback ("degraded"). A step whose cells reach none of the cities
+   * counts as empty and moves to the next step.
+   */
+  async heatmapForCities(seed: Seed, cities: CityPoolEntry[], region: Region): Promise<ToolResult<RegionHeatmap>> {
+    const zeroRows = cities.map((city) => ({ city, affinity: 0, affinityRank: 0, popularity: 0, cells: [] }));
+    if (cities.length === 0) {
+      return envelope("empty", { region, polygon: "", cellCount: 0, cities: [] }, "", Date.now(), true, ["no cities supplied"]);
+    }
+    const polygon = regionPolygonWkt(cities);
+    const emptyData: RegionHeatmap = { region, polygon, cellCount: 0, cities: zeroRows };
     if (!seed.entityIds?.length && !seed.tagIds?.length) {
       return envelope("empty", emptyData, "", Date.now(), true, ["no seed entity or tag supplied"]);
     }
-    const query = locationQueryFor(city);
-    const first = await run(query);
-    // Wrong-city guard: if Qloo matched a locality in another country, retry once with "City, Country".
-    if (first.result.status === "partial" && first.parsed?.status === "partial" && !query.includes(",")) {
-      const second = await run(qualifiedQuery(city));
-      if (second.result.status === "ok" || second.result.status === "degraded") {
-        second.result.meta.note = joinNotes([`retried as "${qualifiedQuery(city)}" after a locality mismatch`, second.result.meta.note]);
-        second.result.meta.ms += first.result.meta.ms;
-        return second.result;
-      }
-    }
-    // "If no localities are found, the API returns a 400 error" (parameters reference): retry qualified once.
-    if (first.result.status === "empty" && /rejected: HTTP 400[^;]*locali/i.test(first.result.meta.note ?? "") && !query.includes(",")) {
-      const second = await run(qualifiedQuery(city));
-      if (second.result.status !== "error" && second.result.status !== "empty") {
-        second.result.meta.ms += first.result.meta.ms;
-        return second.result;
-      }
-    }
-    return first.result;
+    const steps: Step[] = [];
+    if (seed.entityIds?.length) steps.push({ req: qlooRequests.heatmap({ entityIds: seed.entityIds }, polygon) });
+    if (seed.tagIds?.length)
+      steps.push({ req: qlooRequests.heatmap({ tagIds: seed.tagIds }, polygon), fallbackNote: "seeded by genre/taste tags, not the act" });
+    const { result } = await this.ladder<RegionHeatmap>(
+      steps,
+      (body) => {
+        const data = toRegionHeatmap(body, cities, region, polygon);
+        if (!data) return undefined;
+        const covered = data.cities.filter((c) => c.cells.length > 0).length;
+        if (covered === 0) {
+          return { data, count: 0, note: data.cellCount > 0 ? `${data.cellCount} cells, none within ${CITY_CELL_RADIUS_KM} km of a requested city` : undefined };
+        }
+        return { data, count: covered, ...heatmapCoverage(data) };
+      },
+      emptyData,
+      { actIds: seed.entityIds ?? [] },
+    );
+    return result;
   }
 
   async demographics(seed: Seed, opts: { locationQuery?: string } = {}): Promise<ToolResult<DemographicsData>> {
@@ -484,6 +439,9 @@ export class LiveQlooClient implements QlooClient {
       { trend: "unknown" },
       { actIds: [entityId] },
     );
+    if (result.status === "empty" && weeks < TRENDING_MIN_WEEKS) {
+      result.meta.note = joinNotes([`Qloo returns no rows for windows under about ${TRENDING_MIN_WEEKS} weeks (asked for ${weeks})`, result.meta.note]);
+    }
     return result;
   }
 
@@ -517,13 +475,12 @@ export class LiveQlooClient implements QlooClient {
       (body) => {
         const parsed = toCompare(body);
         if (!parsed) return undefined;
-        if (!parsed.scored && parsed.items > 0) {
-          return { data: parsed.data, count: parsed.items, status: "degraded", note: "compare returned no usable per-side taste scores; derived taste similarity not computed" };
-        }
+        if (!parsed.scored) return { data: emptyData, count: 0, note: "compare returned no shared/per-side tag lists" };
+        const { shared, onlyA, onlyB } = parsed.counts;
         return {
           data: parsed.data,
-          count: parsed.scored ? Math.max(1, parsed.items) : 0,
-          note: parsed.scored ? "Soundcheck derived taste similarity from per-side scores; not measured shared-fan overlap" : "No usable per-side scores for derived taste similarity",
+          count: parsed.items,
+          note: `derived taste-tag similarity (${shared} shared, ${onlyA} only A, ${onlyB} only B); not measured shared-fan overlap`,
         };
       },
       emptyData,
@@ -594,6 +551,17 @@ export class LiveQlooClient implements QlooClient {
     );
     return result;
   }
+}
+
+/** Trending windows shorter than this came back with no rows on key day (2026-10-14). */
+export const TRENDING_MIN_WEEKS = 26;
+
+/** Status and note for a region heatmap with at least one covered city. Shared with the mock so traces match. */
+export function heatmapCoverage(data: RegionHeatmap): { status?: ToolStatus; note: string } {
+  const uncovered = data.cities.filter((c) => c.cells.length === 0).map((c) => c.city.name);
+  const notes = [`region-normalized: one heatmap query for ${data.region}, ${data.cellCount} cells`];
+  if (uncovered.length) notes.push(`no cells within ${CITY_CELL_RADIUS_KM} km of: ${uncovered.join(", ")}`);
+  return { status: uncovered.length ? "partial" : undefined, note: notes.join("; ") };
 }
 
 function joinNotes(notes: (string | undefined)[]): string | undefined {

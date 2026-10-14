@@ -8,10 +8,14 @@
  * Behaviors worth knowing:
  *  - Names containing "unknown" return "empty" everywhere; names containing "obscure" resolve, but entity-seeded
  *    heatmaps/demographics come back empty (so the agent falls back to tags → "degraded") and lists come back "partial".
- *  - Comedians (person) and podcasts get thinner data than artists: fewer cells, some cities empty, shorter lists.
+ *  - Comedians (person) and podcasts get thinner data than artists: fewer cells, some cities without cells
+ *    (region heatmap → "partial"), shorter lists.
+ *  - Region heatmap cells are synthesized per (seed, city), so a city's values do not depend on the rest of the set
+ *    (unlike live, where the polygon's normalization does).
  *  - City affinity and popularity are spread so a 16-40 city pool lands dots in every quadrant.
  */
-import type { ActType, CityPoolEntry, ToolResult, ToolStatus } from "@/lib/types";
+import type { ActType, CityPoolEntry, Region, ToolResult, ToolStatus } from "@/lib/types";
+import { regionPolygonWkt } from "@/lib/geo";
 import type {
   CityHeatmap,
   CompareData,
@@ -19,12 +23,13 @@ import type {
   EntityCandidate,
   HeatmapCell,
   QlooClient,
+  RegionHeatmap,
   RelatedEntity,
   TagRef,
   TrendingData,
 } from "./contract";
 import type { QlooRequest } from "./client";
-import { locationQueryFor, qlooRequests, trendingWindow, type Seed } from "./live";
+import { heatmapCoverage, qlooRequests, trendingWindow, type Seed } from "./live";
 import { redactParts, type RedactContext } from "./redact";
 import { aggregateHeatmap, AGE_BUCKETS, toTrending } from "./schemas";
 
@@ -192,36 +197,36 @@ export class MockQlooClient implements QlooClient {
     return this.envelope("ok", variants.slice(0, n).map((v) => mockTag(v, type)), req, {});
   }
 
-  async heatmapForCity(seed: Seed, city: CityPoolEntry): Promise<ToolResult<CityHeatmap>> {
-    const emptyData: CityHeatmap = { city, affinity: 0, affinityRank: 0, popularity: 0, cells: [] };
+  async heatmapForCities(seed: Seed, cities: CityPoolEntry[], region: Region): Promise<ToolResult<RegionHeatmap>> {
+    const actIds = seed.entityIds ?? [];
+    const zeroRows: CityHeatmap[] = cities.map((city) => ({ city, affinity: 0, affinityRank: 0, popularity: 0, cells: [] }));
+    const polygon = cities.length ? regionPolygonWkt(cities) : "";
+    const emptyData: RegionHeatmap = { region, polygon, cellCount: 0, cities: zeroRows };
     const entityKey = (seed.entityIds ?? []).join(",");
     const tagKey = (seed.tagIds ?? []).join(",");
-    const actIds = seed.entityIds ?? [];
-    const locationQuery = locationQueryFor(city);
-    const entityReq = qlooRequests.heatmap({ entityIds: seed.entityIds }, locationQuery);
-    const tagReq = qlooRequests.heatmap({ tagIds: seed.tagIds }, locationQuery);
+    const entityReq = qlooRequests.heatmap({ entityIds: seed.entityIds }, polygon);
+    const tagReq = qlooRequests.heatmap({ tagIds: seed.tagIds }, polygon);
 
+    if (cities.length === 0) return this.envelope("empty", emptyData, entityReq, { actIds }, "no cities supplied");
     if (!entityKey && !tagKey) return this.envelope("empty", emptyData, entityReq, { actIds }, "no seed entity or tag supplied");
-    if (isUnknown(entityKey) && !tagKey) return this.envelope("empty", emptyData, entityReq, { actIds }, "no heatmap cells");
-
-    const type = typeFromId(seed.entityIds?.[0]);
     const entityThin = !entityKey || isObscure(entityKey);
     if (entityThin && !tagKey) return this.envelope("empty", emptyData, entityReq, { actIds }, "no heatmap cells for this act");
 
+    const type = typeFromId(seed.entityIds?.[0]);
     const useTags = entityThin;
     const seedKey = useTags ? `tags:${tagKey}` : entityKey;
-    const rand = seededRandom(`heatmap|${seedKey}|${city.id}`);
-    if (THIN_TYPES.has(type) && rand() < 0.15) {
-      return this.envelope("empty", emptyData, useTags ? tagReq : entityReq, { actIds }, "no heatmap cells in this city");
-    }
-
-    const cells = synthCells(rand, city, type, useTags);
-    const agg = aggregateHeatmap(cells);
-    const data: CityHeatmap = { city, ...agg, cells };
+    const rows: CityHeatmap[] = cities.map((city) => {
+      const rand = seededRandom(`heatmap|${seedKey}|${city.id}`);
+      if (THIN_TYPES.has(type) && rand() < 0.15) return { city, affinity: 0, affinityRank: 0, popularity: 0, cells: [] };
+      const cells = synthCells(rand, city, type, useTags);
+      return { city, ...aggregateHeatmap(cells), cells };
+    });
+    const data: RegionHeatmap = { region, polygon, cellCount: rows.reduce((n, r) => n + r.cells.length, 0), cities: rows };
+    const coverage = heatmapCoverage(data);
     if (useTags) {
-      return this.envelope("degraded", data, tagReq, { actIds }, "fallback: seeded by genre/taste tags, not the act");
+      return this.envelope("degraded", data, tagReq, { actIds }, `fallback: seeded by genre/taste tags, not the act; ${coverage.note}`);
     }
-    return this.envelope("ok", data, entityReq, { actIds });
+    return this.envelope(coverage.status ?? "ok", data, entityReq, { actIds }, coverage.note);
   }
 
   async demographics(seed: Seed, opts: { locationQuery?: string } = {}): Promise<ToolResult<DemographicsData>> {

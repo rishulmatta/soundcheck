@@ -6,7 +6,18 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
 **Deadline:** Oct 30, 2026, 11:45 pm ET. Submit by Oct 29.
 
 ## Last updated
-2026-10-13 (session 5)
+2026-10-14 (session 6)
+
+## Session 6: live Qloo, region-normalized scoring
+
+- Qloo key arrived. The key-day checklist and the live-data gate were run with direct API calls (findings below under "Key-day findings"; raw responses outside git). The user's decision: the three saved demos stay synthetic as they are; every new plan runs fully live.
+- **Scoring moved to one region-wide heatmap per plan** because per-city heatmaps are normalized within each query and cannot be compared. `heatmapForCities(seed, cities, region)` replaces `heatmapForCity` in the client contract (`src/lib/qloo/contract.ts`); the live client sends `filter.location=<WKT polygon>` built from the full region pool (`src/lib/geo.ts`, whole-degree bounds plus 1°), assigns cells within 40 km to each city and takes the top-10 mean (`toRegionHeatmap` in `schemas.ts`). Thin cities (no cells in reach) are re-seeded by taste tags through the same path. The mock mirrors the envelope. `probeCities` makes one call over the whole region pool (exclusions included in the polygon, never scored) so locks, drops and revisions never change the normalization or the cache key.
+- **Quadrant rule** (`src/lib/score.ts`): reach = affinity < 0.5; untapped = affinity ≥ 0.5 and affinity − popularity ≥ 0.02; established otherwise. The underserved formula is unchanged. Charts draw the gate and the diagonal for region-normalized plans and keep the old vertical split for the saved demos (`comparability` prop on `QuadrantChart` and `MiniQuadrant`).
+- **Provenance** `heatmapComparability` is now `"unverified" | "region-normalized"` (live plans get the latter; mock, unknown and legacy plans stay unverified). Copy rules, the template copy, the evidence banner, print view and prompts switch on it: live copy must name the region-wide heatmap and frame cities as research leads; the "unverified in every sentence" rule applies only to unverified plans.
+- **Compare** now derives similarity from the tag sets Qloo returns (shared over union, labeled derived taste-tag similarity, status ok). **Momentum** asks for 26 weeks (Qloo returns nothing under about 26) and reads "no movement in Qloo's series" when the series is flat.
+- **First live plan** (local, Khruangbin, 6 stops, North America, plan `TDMjfOwwin`): 59.5 s, 33 Qloo calls over 10 call types, one region heatmap with 5,277 cells covering 42/42 cities, momentum flat over 26 weeks, 7 model calls (124,947 input tokens, 86,095 cache reads, 38,808 cache writes, 5,158 output). Route Portland → Seattle → San Francisco → Los Angeles → Denver → Austin, all "established" (affinity 0.92 to 0.98 with popularity to match); Albuquerque (0.61 vs 0.59) was the only untapped candidate. Openers with derived similarity: Glass Beams 0.72, Black Pumas 0.77, Brainstory 0.87, SAULT 0.55. Places and sponsors are real (Wonder Ballroom, KEXP, The Independent, Patagonia, REI). Checked in headless Chrome at 1280 and 390 px: banner, chart boundary, labels, no overflow, no console errors.
+- Known rough edges seen on the live run, not fixed: taste tags for Khruangbin include place tags ("Pork Buns", "Four Star", "Identifies as women-owned") because `tasteTags` is not filtered to music tags; the orchestrator still profiles every routed city with the act-wide demographics call (7 degraded trace entries, all cached); per-stop copy repeats the "affinity X against popularity Y" shape.
+- Verification: typecheck, lint, 229 tests, production build green.
 
 ## Session 5: window field
 
@@ -49,20 +60,19 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
 - [ ] Join Qloo Discord `#api-help`: https://discord.gg/rF9PKsD5Q7
 - [ ] Escalate in `#api-help` if the key has not arrived by Oct 16
 
-## Key-day checklist (run the moment QLOO_API_KEY arrives)
-Findings from building the Qloo layer against the live docs on 2026-10-12. Each needs a real response to settle.
-- [ ] Put the key in `.env.local` as `QLOO_API_KEY`, set `QLOO_MOCK=0`, run `curl -N -X POST localhost:3000/api/plan -H 'content-type: application/json' -d '{"actQuery":"<real act>","stops":8}'`
-- [ ] **Heatmap comparability:** per-city `filter.location.query` heatmaps may be normalized within each city (docs example tops out at exactly 1.0). If so, the quadrant chart is wrong. Compare against one regional query with `output.heatmap.boundary=urn:entity:locality`. The client notes `meta.note` when the top cell is exactly 1.
-- [ ] **Compare response shape** for `/v2/analysis/compare`: overlap is computed from per-side scores if present, else "degraded" with overlap 0. Inspect a real response and fix `schemas.ts`. Checked 2026-10-12 against the official harness (`@qloo/qloo-harness` 0.1.26, `dist/qloo-tools.js` makeCompareAudiencesTool): its request is identical to ours (`a.signal.interests.entities`, `b.signal.interests.entities`, optional `filter.type`, plus `take`), and it passes `response.results` through untyped, so it reveals nothing about the body. Our defensive parser stands; a live call is still the only way to settle it.
-- [ ] **Explainability JSON layout** (`query.explainability`): parsed defensively; confirm field names. It returns scores only, so the client writes the sentence itself.
-- [ ] Do `signal.location.query` and `feature.explainability` change artist/person/podcast results, or are they silently ignored?
-- [ ] Video game type URN: `urn:entity:videogame` on /search, /v2/trending, compare vs `urn:entity:video_game` on insights. Confirm which each endpoint accepts. Note: the harness sends the Insights URN (`video_game`) to compare, we send the search URN; identical for artist/person/podcast, so only matters if video games are enabled.
-- [ ] Trending percentile scale (0–100 vs 0–1); code handles both.
-- [ ] Does heatmap `take=50` cap cells?
-- [ ] Demographics cannot be localized per the docs; the agent calls it without a location. Check whether a location param exists anyway.
-- [ ] Comedian openers: taxonomy tag is `urn:tag:genre:person:comedian` (not occupation). Consider adding an optional `tagIds` filter to `relatedActs` in the contract.
-- [ ] Gender comes back as scores vs baseline, not shares (types, fixture, UI and CSV already switched to scores on 2026-10-12).
-- [ ] Test comedian, podcast and author coverage for the seeded acts (Khruangbin, Nate Bargatze, The Rest Is History; set in `src/lib/seeds.ts`, swap if thin); then flush old mock plans from Redis (`plan:demo-*` keys) so they re-seed live.
+## Key-day findings (2026-10-14, live key, raw responses kept outside git)
+Every item below was settled with direct calls to https://hackathon.api.qloo.com and zero model calls. Raw bodies live in the session scratchpad only.
+- [x] Key in `.env.local` (`QLOO_API_KEY`, `QLOO_MOCK=0`); user placed it with a `!` sed command. The server URL is the client default.
+- [x] **Heatmap comparability: per-city queries are NOT comparable.** `filter.location.query=<city>` returns `affinity` and `popularity` rank-normalized within that query: Austin, Boise, Tulsa and Omaha each came back min 0, max 1, mean 0.5. `take` does not cap cells (25, 50 and none all returned the same 1,200 cells for Austin). `output.heatmap.boundary` returns HTTP 500. **Fix shipped:** one query per region with `filter.location=<WKT POLYGON>` around the pool (plus 1°) returns geohash-4 cells normalized over the region; cells within 40 km of each pool city are assigned to it and the top-10 mean is the city value. Coverage with Khruangbin: North America 5,488 cells, 42/42 cities (5 to 11 cells each, 2.7 s); UK and Ireland 724 cells, 17/17; Europe 4,186 cells, 25/25 once the box reaches 62°N for Helsinki. Tag-seeded region queries work too (17,893 cells). Sparse acts: Hermanos Gutiérrez 1,234 cells 42/42; Sunset Rubdown 4,125 cells 42/42 with real gaps (Ottawa affinity 0.88 vs popularity 0.60, Halifax 0.93 vs 0.72); Yin Yin 471 cells, 40/42. For a well-known act affinity and popularity track each other closely (Khruangbin gaps between −0.16 and +0.11), so the quadrant rule changed: untapped = affinity ≥ 0.5 and affinity − popularity ≥ 0.02; established = affinity ≥ 0.5 otherwise; reach = affinity < 0.5 (`src/lib/score.ts`).
+- [x] **Compare response shape:** `results.tags[]` are the shared tags with `query.score`, `results.a[]` / `results.b[]` each side's tag list with `query.count`, `results.matchEntities` is empty. No per-side affinities exist, so the old parser always degraded to overlap 0. Now a tag-set similarity (shared over the union) labeled derived taste similarity.
+- [x] **Explainability:** `query.explainability.signal.interests.entities[]` carries `{entity_id, score}` per result; the client writes the sentence. Parsed fine live.
+- [x] `signal.location.query` changes related-act results (Austin list differs from the global list). `feature.explainability` is honoured on insights.
+- [x] Video game URN: `/search` accepts `urn:entity:videogame` and rejects `urn:entity:video_game`. Games stay disabled; no change.
+- [x] Trending percentile is 0..1 (`population_percentile` 0.11 for Khruangbin, constant over 52 weeks; `population_rank_velocity` 0 for Khruangbin and Taylor Swift alike). Windows under about 26 weeks return zero rows regardless of `take`; 26 weeks gave 29 rows, 40 and 52 weeks gave 50 (the cap). Momentum now asks for 26 weeks and reads "no movement in Qloo's series" rather than a trend.
+- [x] Demographics ignore `signal.location.query` and `filter.location.query` (byte-identical bodies). Act-wide only, as coded.
+- [ ] Comedian openers: taxonomy tag is `urn:tag:genre:person:comedian`. Optional `tagIds` filter on `relatedActs` still open.
+- [x] Gender comes back as scores vs baseline (unchanged).
+- [ ] Comedian and podcast live coverage (Nate Bargatze, The Rest Is History) not yet run live. The three saved demos stay synthetic by the user's decision (2026-10-14: "leave demo maps as is, but for new artist we must use everything live").
 
 ## Pending: day 0 to 2 scaffold (Oct 11 to 13)
 - [x] Next.js 16.4 scaffolded (App Router, TypeScript, Tailwind v4, src/, pnpm). Note: this Next.js has breaking changes; read `AGENTS.md` and `node_modules/next/dist/docs/` before writing app code.
@@ -130,8 +140,8 @@ Findings from building the Qloo layer against the live docs on 2026-10-12. Each 
 - KV choice: Upstash Redis (Marketplace) vs Vercel KV. Pick whichever provisions fastest.
 
 ## Next session starts here
-1. Read the session 4 and 5 entries and `docs/VALIDATION.md`. Do not rebuild already-implemented features from historical unchecked lists.
-2. If the Qloo key has arrived: run the live-data gate and key-day checklist first. Otherwise keep synthetic labels and do not claim geographic validation.
+1. Read the session 4, 5 and 6 entries and `docs/VALIDATION.md`. Do not rebuild already-implemented features from historical unchecked lists.
+2. Live Qloo is on. Still open from key day: comedian and podcast live coverage, the `tagIds` filter for comedian openers, filtering taste tags to music/genre tags, and the per-city demographics calls in the guard.
 3. Ask the user to try the revision controls in a browser (drag a stop, Drop and Lock a card, type a request into the revise bar, Re-run) and fix whatever they report. Open questions: should Drop shrink the tour instead of replacing the city; should a city-set change keep the hand order as a backbone rather than discarding it.
 4. Week 1 list: act autocomplete, the small UI issues above. Copy quality: "1x the pool's median" reads oddly for reach cities; consider rounding language or a different lead for the reach quadrant.
 5. Update this file before ending the session.

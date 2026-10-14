@@ -112,7 +112,7 @@ export function TourView({ plan }: { plan: Plan }) {
       {/* Top-right: quadrant thumbnail and close. */}
       <div className="absolute right-4 top-4 flex items-start gap-3 sm:right-6 sm:top-6">
         <div className="pointer-events-none hidden rounded-md border border-line bg-bg-raised p-2 sm:block">
-          <MiniQuadrant candidates={plan.candidates} currentId={current?.city.id} />
+          <MiniQuadrant candidates={plan.candidates} currentId={current?.city.id} comparability={provenanceFor(plan).heatmapComparability} />
         </div>
         <Link
           href={`/plan/${plan.id}`}

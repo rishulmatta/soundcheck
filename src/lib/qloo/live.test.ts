@@ -3,12 +3,24 @@ import type { CityPoolEntry } from "@/lib/types";
 import { MemoryCache } from "./cache";
 import { QlooHttpClient } from "./client";
 import { LiveQlooClient } from "./live";
-import { aggregateHeatmap } from "./schemas";
+import { aggregateHeatmap, toCompare, toRegionHeatmap } from "./schemas";
 
 // Synthetic payloads shaped like the documented responses. Not real Qloo data.
 const ACT = "00000000-0000-4000-8000-000000000001";
 const OPENER = "00000000-0000-4000-8000-000000000002";
 const BOISE: CityPoolEntry = { id: "boise", name: "Boise", country: "US", lat: 43.62, lon: -116.21, metroM: 0.8 };
+const MERIDIAN: CityPoolEntry = { id: "meridian", name: "Meridian", country: "US", lat: 43.61, lon: -116.39, metroM: 0.1 };
+const SPOKANE: CityPoolEntry = { id: "spokane", name: "Spokane", country: "US", lat: 47.66, lon: -117.43, metroM: 0.6 };
+const CITIES = [BOISE, MERIDIAN, SPOKANE];
+/** regionPolygonWkt(CITIES), percent-encoded as the client sends it. */
+const POLYGON_QS = "POLYGON((-119%2042,-115%2042,-115%2049,-119%2049,-119%2042))";
+
+const cell = (lat: number, lon: number, affinity: number, popularity = 0.5) => ({
+  location: { latitude: lat, longitude: lon, geohash: "9rwm" },
+  query: { affinity, affinity_rank: affinity, popularity },
+});
+/** c1 sits on Boise and is ~14 km from Meridian (counts for both); c2 is ~33 km from Meridian, ~48 km from Boise; c3 is far from all. */
+const REGION_CELLS = [cell(43.62, -116.21, 0.9, 0.2), cell(43.61, -116.8, 0.5, 0.6), cell(40, -100, 1, 1)];
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -66,43 +78,76 @@ describe("LiveQlooClient envelopes", () => {
     expect(res.data.map((d) => d.name)).toEqual(["One", "Two"]);
   });
 
-  it('falls back to a tag seed and returns "degraded" when the act heatmap is empty', async () => {
-    const cells = [
-      { location: { latitude: 43.6, longitude: -116.2, geohash: "9rwm" }, query: { affinity: 0.8, affinity_rank: 0.7, popularity: 0.2 } },
-      { location: { latitude: 43.61, longitude: -116.22, geohash: "9rwn" }, query: { affinity: 0.6, affinity_rank: 0.5, popularity: 0.4 } },
-    ];
-    const { client, calls } = setup([
-      json({ success: true, results: { heatmap: [] } }),
-      json({ success: true, results: { heatmap: cells }, query: { localities: { filter: { name: "Boise", disambiguation: "Boise, Idaho, United States" } } } }),
-    ]);
-    const res = await client.heatmapForCity({ entityIds: [ACT], tagIds: ["urn:tag:genre:music:indie"] }, BOISE);
-    expect(res.status).toBe("degraded");
-    expect(calls).toHaveLength(2);
-    expect(res.meta.request).toBe("GET /v2/insights?filter.type=urn:heatmap&filter.location.query=Boise&signal.interests.tags=[tags]&take=50");
-    expect(res.data.cells).toHaveLength(2);
-    expect(res.data.affinity).toBeCloseTo(0.7);
-    expect(res.data.popularity).toBeCloseTo(0.3);
+  it("sends one polygon heatmap query for the city set and marks uncovered cities partial", async () => {
+    const { client, calls } = setup([json({ success: true, results: { heatmap: REGION_CELLS } })]);
+    const res = await client.heatmapForCities({ entityIds: [ACT], tagIds: ["urn:tag:genre:music:indie"] }, CITIES, "north-america");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe(
+      `https://hackathon.api.qloo.com/v2/insights?filter.type=urn:heatmap&filter.location=${POLYGON_QS}&signal.interests.entities=${ACT}`,
+    );
+    expect(calls[0].url).not.toContain("take=");
+    expect(res.meta.request).toBe(`GET /v2/insights?filter.type=urn:heatmap&filter.location=${POLYGON_QS}&signal.interests.entities=[act]`);
+    expect(res.status).toBe("partial");
+    expect(res.meta.note).toContain("region-normalized: one heatmap query for north-america, 3 cells");
+    expect(res.meta.note).toContain("no cells within 40 km of: Spokane");
+    expect(res.data.polygon).toBe("POLYGON((-119 42,-115 42,-115 49,-119 49,-119 42))");
+    expect(res.data.cities.map((c) => c.city.id)).toEqual(["boise", "meridian", "spokane"]);
+    expect(res.data.cities.map((c) => c.cells.length)).toEqual([1, 2, 0]);
+    expect(res.data.cities[1].affinity).toBeCloseTo(0.7);
   });
 
-  it('marks a heatmap "partial" and retries qualified when the locality lands in another country', async () => {
-    const cell = { location: { latitude: 1, longitude: 1 }, query: { affinity: 0.5, affinity_rank: 0.5, popularity: 0.5 } };
-    const { client, calls } = setup([
-      json({ results: { heatmap: [cell] }, query: { localities: { filter: { disambiguation: "Boise, Somewhere, Elsewhere" } } } }),
-      json({ results: { heatmap: [cell] }, query: { localities: { filter: { disambiguation: "Boise, Idaho, United States" } } } }),
-    ]);
-    const res = await client.heatmapForCity({ entityIds: [ACT] }, BOISE);
-    expect(calls[1].url).toContain("filter.location.query=Boise,%20United%20States");
+  it('returns "ok" when every city gets cells', async () => {
+    const { client } = setup([json({ results: { heatmap: [...REGION_CELLS, cell(47.7, -117.4, 0.3)] } })]);
+    const res = await client.heatmapForCities({ entityIds: [ACT] }, CITIES, "north-america");
     expect(res.status).toBe("ok");
-    expect(res.meta.note).toContain("locality mismatch");
+    expect(res.meta.note).toBe("region-normalized: one heatmap query for north-america, 4 cells");
+    expect(res.data.cellCount).toBe(4);
+  });
+
+  it('falls back to a tag seed and returns "degraded" when the act heatmap is empty', async () => {
+    const { client, calls } = setup([json({ success: true, results: { heatmap: [] } }), json({ success: true, results: { heatmap: REGION_CELLS } })]);
+    const res = await client.heatmapForCities({ entityIds: [ACT], tagIds: ["urn:tag:genre:music:indie"] }, CITIES, "north-america");
+    expect(calls).toHaveLength(2);
+    expect(res.status).toBe("degraded");
+    expect(res.meta.request).toBe(`GET /v2/insights?filter.type=urn:heatmap&filter.location=${POLYGON_QS}&signal.interests.tags=[tags]`);
+    expect(res.meta.note).toContain("fallback: seeded by genre/taste tags, not the act");
+    expect(res.meta.note).toContain("no cells within 40 km of: Spokane");
+    expect(res.data.cities[0].affinity).toBeCloseTo(0.9);
+  });
+
+  it('returns "empty" with zero rows for every city when the region has no cells', async () => {
+    const { client, calls } = setup([json({ results: { heatmap: [] } }), json({ results: { heatmap: [] } })]);
+    const res = await client.heatmapForCities({ entityIds: [ACT], tagIds: ["urn:tag:genre:music:indie"] }, CITIES, "north-america");
+    expect(calls).toHaveLength(2);
+    expect(res.status).toBe("empty");
+    expect(res.data.cellCount).toBe(0);
+    expect(res.data.cities).toHaveLength(3);
+    expect(res.data.cities.every((c) => c.cells.length === 0 && c.affinity === 0)).toBe(true);
+  });
+
+  it("treats cells that reach no requested city as empty and tries the tag seed", async () => {
+    const { client, calls } = setup([json({ results: { heatmap: [cell(40, -100, 1)] } }), json({ results: { heatmap: [] } })]);
+    const res = await client.heatmapForCities({ entityIds: [ACT], tagIds: ["urn:tag:genre:music:indie"] }, CITIES, "north-america");
+    expect(calls).toHaveLength(2);
+    expect(res.status).toBe("empty");
+    expect(res.meta.note).toContain("1 cells, none within 40 km of a requested city");
   });
 
   it("maps a 400 to empty with the API message and does not retry", async () => {
-    const { client, fetchImpl } = setup([json({ error: "No localities found" }, 400), json({ error: "No localities found" }, 400)]);
-    const res = await client.heatmapForCity({ entityIds: [ACT] }, BOISE);
+    const { client, fetchImpl } = setup([json({ error: "Invalid location" }, 400)]);
+    const res = await client.heatmapForCities({ entityIds: [ACT] }, CITIES, "north-america");
     expect(res.status).toBe("empty");
-    expect(res.meta.note).toContain("No localities found");
-    // one call for "Boise", one qualified retry for "Boise, United States"; neither is retried with backoff
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(res.meta.note).toContain("Invalid location");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns empty without calling Qloo when there is no seed or no city", async () => {
+    const { client, fetchImpl } = setup([]);
+    expect((await client.heatmapForCities({}, CITIES, "north-america")).status).toBe("empty");
+    const none = await client.heatmapForCities({ entityIds: [ACT] }, [], "north-america");
+    expect(none.status).toBe("empty");
+    expect(none.data.cities).toEqual([]);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it('retries 429/5xx with backoff and reports "error" after 3 retries', async () => {
@@ -217,28 +262,67 @@ describe("response mapping", () => {
     expect(res.data[0].affinity).toBeCloseTo(0.91);
   });
 
-  it("derives taste similarity from per-side scores without claiming a shared-fan percentage", async () => {
-    const { client } = setup([
-      json({
-        results: [
-          { name: "Indie", query: { a: { affinity: 0.8 }, b: { affinity: 0.4 } } },
-          { name: "Dream Pop", query: { a: { affinity: 0.6 }, b: { affinity: 0.6 } } },
-        ],
-      }),
-    ]);
+  it("notes the ~26-week floor when a short trending window comes back empty", async () => {
+    const { client, calls } = setup([json({ results: { trending: [] } }), json({ results: { trending: [] } })]);
+    const short = await client.trending(ACT, "artist", { weeks: 8 });
+    expect(short.status).toBe("empty");
+    expect(short.meta.note).toContain("Qloo returns no rows for windows under about 26 weeks");
+    const long = await client.trending(ACT, "artist", { weeks: 26 });
+    expect(calls[1].url).toContain("take=26");
+    expect(long.status).toBe("empty");
+    expect(long.meta.note ?? "").not.toContain("under about 26 weeks");
+  });
+
+  // Shaped like the live /v2/analysis/compare body: results.tags = shared (query.score), results.a / results.b = each
+  // side's tags (query.count, as a string), matchEntities []. a and b repeat some shared tags; "x" is in both a and b.
+  const tag = (id: string, name: string, query: Record<string, unknown>) => ({ tag_id: `urn:tag:t:${id}`, name, type: "urn:tag", query });
+  const COMPARE_BODY = {
+    duration: 12,
+    results: {
+      tags: [tag("soul", "Soul", { score: 0.9 }), tag("jazz", "Jazz", { score: 0.99 }), tag("funk", "Funk", { score: 0.6 })],
+      a: [tag("soul", "Soul", { count: "1" }), tag("a1", "A1", { count: "1" }), tag("a2", "A2", { count: "1" }), tag("x", "X", { count: "1" })],
+      b: [tag("jazz", "Jazz", { count: "1" }), tag("b1", "B1", { count: "1" }), tag("x", "X", { count: "1" })],
+      matchEntities: [],
+    },
+  };
+
+  it("derives a Jaccard taste-tag similarity from shared vs side-only tags", async () => {
+    const { client } = setup([json(COMPARE_BODY)]);
     const res = await client.compareAudiences(ACT, OPENER, "artist");
     expect(res.status).toBe("ok");
-    expect(res.data.overlap).toBeCloseTo(0.75);
-    expect(res.data.sharedTags).toEqual(["Dream Pop", "Indie"]);
+    // shared {soul, jazz, funk, x} = 4; only A {a1, a2} = 2; only B {b1} = 1 → 4 / 7
+    expect(res.data.overlap).toBe(0.57);
+    expect(res.data.sharedTags).toEqual(["Jazz", "Soul", "Funk"]);
+    expect(res.meta.note).toContain("4 shared, 2 only A, 1 only B");
     expect(res.meta.note).toContain("not measured shared-fan overlap");
   });
 
-  it("does not reinterpret an undocumented top-level score as measured audience overlap", async () => {
+  it("caps shared tags at five and scores zero when nothing is shared", () => {
+    const many = { results: { tags: Array.from({ length: 8 }, (_, i) => tag(`s${i}`, `S${i}`, { score: i / 10 })), a: [], b: [] } };
+    expect(toCompare(many)?.data).toEqual({ overlap: 1, sharedTags: ["S7", "S6", "S5", "S4", "S3"] });
+    const disjoint = toCompare({ results: { tags: [], a: [tag("a", "A", {})], b: [tag("b", "B", {})] } });
+    expect(disjoint).toMatchObject({ scored: true, data: { overlap: 0, sharedTags: [] } });
+  });
+
+  it("does not reinterpret an undocumented top-level score as audience overlap", async () => {
     const { client } = setup([json({ results: { overlap: 0.9, similarity: 0.8, score: 0.7 } })]);
     const res = await client.compareAudiences(ACT, OPENER, "artist");
-    expect(res.status).not.toBe("ok");
+    expect(res.status).toBe("empty");
     expect(res.data.overlap).toBe(0);
-    expect(res.meta.note).toContain("No usable per-side scores");
+    expect(res.meta.note).toContain("no shared/per-side tag lists");
+  });
+
+  it("assigns region cells to every city within the radius", () => {
+    const parsed = toRegionHeatmap({ results: { heatmap: [...REGION_CELLS, { location: { latitude: 1 } }] } }, CITIES, "north-america", "P");
+    expect(parsed?.cellCount).toBe(3);
+    expect(parsed?.region).toBe("north-america");
+    expect(parsed?.polygon).toBe("P");
+    const [boise, meridian, spokane] = parsed!.cities;
+    expect(boise.cells.map((c) => c.affinity)).toEqual([0.9]);
+    expect(meridian.cells.map((c) => c.affinity)).toEqual([0.9, 0.5]);
+    expect(meridian).toMatchObject({ affinity: 0.7, popularity: 0.4 });
+    expect(spokane).toMatchObject({ cells: [], affinity: 0, affinityRank: 0, popularity: 0 });
+    expect(toRegionHeatmap({ results: { heatmap: [] } }, CITIES, "north-america", "P")?.cities).toHaveLength(3);
   });
 
   it("aggregates the top-N cells by affinity", () => {

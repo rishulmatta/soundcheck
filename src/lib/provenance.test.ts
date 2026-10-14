@@ -12,6 +12,30 @@ describe("saved plan provenance", () => {
     expect(provenanceFor({ ...plan, provenance: createProvenance("live") }).dataMode).toBe("live");
   });
 
+  it("marks only live provenance region-normalized, and preserves a saved value", () => {
+    expect(createProvenance("live").heatmapComparability).toBe("region-normalized");
+    expect(createProvenance("mock").heatmapComparability).toBe("unverified");
+    expect(createProvenance("unknown").heatmapComparability).toBe("unverified");
+    const plan = legacy();
+    // A live plan saved before the region heatmap keeps "unverified"; it is never upgraded from the data mode.
+    plan.provenance = { ...createProvenance("live"), heatmapComparability: "unverified" };
+    expect(provenanceFor(plan)).toMatchObject({ dataMode: "live", heatmapComparability: "unverified" });
+    plan.provenance = createProvenance("live");
+    expect(provenanceFor(plan)).toMatchObject({ dataMode: "live", heatmapComparability: "region-normalized" });
+    // Synthetic ids override a contradictory saved value.
+    plan.act.id = "mock-artist-example";
+    expect(provenanceFor(plan)).toMatchObject({ dataMode: "mock", heatmapComparability: "unverified" });
+  });
+
+  it("words legacy fallback copy by the plan's comparability", () => {
+    const plan = legacy();
+    plan.provenance = { ...createProvenance("live"), proseVersion: undefined };
+    const copy = safeStopCopy(plan, plan.stops[0]).whyHere;
+    expect(copy).toContain("one region-wide Qloo heatmap");
+    expect(copy).not.toContain("unverified");
+    expect(copy).toContain("does not establish ticket demand");
+  });
+
   it("recognizes synthetic act and recommendation ids, even if contradictory metadata claims live", () => {
     const plan = legacy();
     plan.provenance = createProvenance("live");

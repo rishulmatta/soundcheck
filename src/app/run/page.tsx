@@ -281,7 +281,7 @@ export default function RunPage() {
               )}
             </div>
             {candidates.length > 0 ? (
-              <QuadrantChart candidates={candidates} stops={stops} activeStop={sel.active} selected={sel.selected !== undefined && sel.selected === sel.active} onHoverStop={sel.setHovered} onSelectStop={sel.toggle} className="sc-fade" />
+              <QuadrantChart candidates={candidates} stops={stops} comparability={plan ? provenanceFor(plan).heatmapComparability : state.provenance?.heatmapComparability} activeStop={sel.active} selected={sel.selected !== undefined && sel.selected === sel.active} onHoverStop={sel.setHovered} onSelectStop={sel.toggle} className="sc-fade" />
             ) : (
               <div aria-hidden="true" className="rounded-md border border-line bg-bg-raised p-5">
                 <Skeleton className="mb-3 h-7 w-56" />

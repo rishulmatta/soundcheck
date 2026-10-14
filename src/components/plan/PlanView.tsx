@@ -79,6 +79,7 @@ export function PlanView({ plan }: { plan: Plan }) {
             <QuadrantChart
               candidates={plan.candidates}
               stops={viewStops}
+              comparability={provenanceFor(plan).heatmapComparability}
               activeStop={sel.active}
               selected={sel.selected !== undefined && sel.selected === sel.active}
               onHoverStop={sel.setHovered}

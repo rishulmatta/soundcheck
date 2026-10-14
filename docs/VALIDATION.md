@@ -1,8 +1,10 @@
 # Validation record and protocol
 
-October 13, 2026: no local Qloo key; live semantics and customer usefulness remain unvalidated. Synthetic tests verify behavior only. The tasks below are not completed results.
+October 14, 2026: the Qloo key arrived and the live-data gate below was run against https://hackathon.api.qloo.com with direct calls (no model spend). Findings and the resulting code changes are recorded in `docs/STATUS.md` under "Key-day findings". Customer usefulness remains unvalidated. Raw responses stay outside Git.
 
 ## Live-data gate
+
+Status per step (2026-10-14): 1 done locally, Railway pending the user's variable change; 2 Khruangbin resolved (entity `BAF6317A…`); 3 settled: separate heatmap queries do NOT share a scale, one region polygon query does, `take` has no effect on cells, `output.heatmap.boundary` fails with 500; 4 done: 40 km radius, top-10 mean, rankings stable across the sparse acts probed; 5 done: compare carries shared tags and per-side tag lists only, similarity is derived; 6 done: demographics ignore location, trending is 0..1 and flat, explainability is per-signal scores, localization changes related acts; 7 done: Khruangbin plus three sparse acts, tag fallback inspected; 8 changed by the user: saved examples stay synthetic, only new plans are live.
 
 1. Configure the key and disable mock mode. Verify health and the new plan's persisted source independently; old examples stay synthetic.
 2. Resolve the musician and confirm identity against an official external link.

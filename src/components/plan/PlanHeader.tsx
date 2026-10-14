@@ -11,7 +11,7 @@ import { Check, Download, FileText, Link2, Play, Shuffle } from "@/components/ui
 import { ACT_TYPE_LABEL, planParams } from "./format";
 import { ActLinks, ActPortrait, hasConfirmedQlooMatch } from "./ActIdentity";
 
-const TREND = { rising: "▲ Rising", flat: "▬ Flat", falling: "▼ Falling", unknown: "Momentum unavailable" } as const;
+const TREND = { rising: "▲ Rising", flat: "▬ No movement", falling: "▼ Falling", unknown: "Momentum unavailable" } as const;
 
 function copyText(text: string): Promise<void> {
   if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);

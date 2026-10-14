@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ToolMeta, ToolStatus, type CityPoolEntry } from "@/lib/types";
+import { ToolMeta, ToolStatus } from "@/lib/types";
 import { getCityPool } from "@/data/cities";
+import { regionPolygonWkt } from "@/lib/geo";
+import { encodeQueryValue } from "./redact";
 import { getQloo, QLOO_CALL_TYPES, qlooMode, resetQlooForTests } from "./index";
 import { LiveQlooClient } from "./live";
 import { MockQlooClient } from "./mock";
@@ -16,9 +18,15 @@ function expectEnvelope(res: { status: unknown; meta: unknown }) {
 describe("MockQlooClient", () => {
   it("is deterministic across instances and calls", async () => {
     const other = new MockQlooClient();
-    const city = getCityPool("north-america")[0];
+    const pool = getCityPool("north-america");
     expect(await mock.searchEntity("The Example Band", "artist")).toEqual(await other.searchEntity("The Example Band", "artist"));
-    expect(await mock.heatmapForCity({ entityIds: [ACT] }, city)).toEqual(await other.heatmapForCity({ entityIds: [ACT] }, city));
+    expect(await mock.heatmapForCities({ entityIds: [ACT] }, pool, "north-america")).toEqual(
+      await other.heatmapForCities({ entityIds: [ACT] }, pool, "north-america"),
+    );
+    // a city's values depend only on (seed, city), not on the rest of the set
+    const whole = await mock.heatmapForCities({ entityIds: [ACT] }, pool, "north-america");
+    const pair = await mock.heatmapForCities({ entityIds: [ACT] }, [pool[3], pool[0]], "north-america");
+    expect(pair.data.cities).toEqual([whole.data.cities[3], whole.data.cities[0]]);
     expect(await mock.relatedActs(ACT, "artist", { locationQuery: "Boise", take: 5, explain: true })).toEqual(
       await other.relatedActs(ACT, "artist", { locationQuery: "Boise", take: 5, explain: true }),
     );
@@ -35,9 +43,12 @@ describe("MockQlooClient", () => {
 
   it("spreads a city pool across all four affinity/popularity quadrants", async () => {
     const pool = getCityPool("north-america");
-    const results = await Promise.all(pool.map((c) => mock.heatmapForCity({ entityIds: [ACT] }, c)));
-    const scored = results.filter((r) => r.status === "ok").map((r) => r.data);
+    const res = await mock.heatmapForCities({ entityIds: [ACT] }, pool, "north-america");
+    expect(res.status).toBe("ok");
+    expectEnvelope(res);
+    const scored = res.data.cities;
     expect(scored.length).toBe(pool.length);
+    expect(res.data.cellCount).toBe(scored.reduce((n, c) => n + c.cells.length, 0));
     const quadrants = new Set(scored.map((d) => `${d.affinity >= 0.6 ? "hi" : "lo"}-${d.popularity >= 0.5 ? "hi" : "lo"}`));
     expect(quadrants).toEqual(new Set(["hi-hi", "hi-lo", "lo-hi", "lo-lo"]));
     for (const d of scored) {
@@ -47,19 +58,35 @@ describe("MockQlooClient", () => {
         expect(v).toBeLessThanOrEqual(1);
       }
     }
-    expect(results[0].meta.request).toMatch(/^GET \/v2\/insights\?filter\.type=urn:heatmap&filter\.location\.query=/);
+    expect(res.meta.request).toBe(
+      `GET /v2/insights?filter.type=urn:heatmap&filter.location=${encodeQueryValue(regionPolygonWkt(pool))}&signal.interests.entities=[act]`,
+    );
+    expect(res.meta.note).toContain("region-normalized: one heatmap query for north-america");
   });
 
   it("exercises fallbacks for obscure and unknown acts", async () => {
     const obscure = "mock-artist-an-obscure-act";
-    const city = getCityPool("north-america")[0];
+    const pool = getCityPool("north-america");
     expect((await mock.searchEntity("An Unknown Act", "artist")).status).toBe("empty");
-    expect((await mock.heatmapForCity({ entityIds: [obscure] }, city)).status).toBe("empty");
-    const fallback = await mock.heatmapForCity({ entityIds: [obscure], tagIds: ["urn:tag:mock:indie_rock"] }, city);
+    const empty = await mock.heatmapForCities({ entityIds: [obscure] }, pool, "north-america");
+    expect(empty.status).toBe("empty");
+    expect(empty.data.cities).toHaveLength(pool.length);
+    expect(empty.data.cities.every((c) => c.cells.length === 0)).toBe(true);
+    const fallback = await mock.heatmapForCities({ entityIds: [obscure], tagIds: ["urn:tag:mock:indie_rock"] }, pool, "north-america");
     expect(fallback.status).toBe("degraded");
     expect(fallback.meta.request).toContain("signal.interests.tags=[tags]");
+    expect(fallback.meta.note).toContain("fallback: seeded by genre/taste tags, not the act");
     expect((await mock.relatedActs(obscure, "artist", { take: 5 })).status).toBe("partial");
     expect((await mock.trending(obscure, "artist")).status).toBe("empty");
+  });
+
+  it("leaves some cities without cells for thin act types and names them", async () => {
+    const pool = getCityPool("north-america");
+    const res = await mock.heatmapForCities({ entityIds: ["mock-person-dana-moss"] }, pool, "north-america");
+    const uncovered = res.data.cities.filter((c) => c.cells.length === 0);
+    expect(uncovered.length).toBeGreaterThan(0);
+    expect(res.status).toBe("partial");
+    expect(res.meta.note).toContain(`no cells within 40 km of: ${uncovered.map((c) => c.city.name).join(", ")}`);
   });
 
   it("gives comedians and podcasts thinner data than artists", async () => {
@@ -73,10 +100,9 @@ describe("MockQlooClient", () => {
   });
 
   it("returns contract-shaped data for every method", async () => {
-    const city: CityPoolEntry = getCityPool("uk-ireland")[0];
     const all = [
       await mock.findTags("afterparty"),
-      await mock.heatmapForCity({ entityIds: [ACT] }, city),
+      await mock.heatmapForCities({ entityIds: [ACT] }, getCityPool("uk-ireland"), "uk-ireland"),
       await mock.demographics({ entityIds: [ACT] }),
       await mock.trending(ACT, "artist"),
       await mock.relatedActs(ACT, "artist", { take: 3, explain: true }),

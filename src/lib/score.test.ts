@@ -26,10 +26,20 @@ describe("underservedScore", () => {
 });
 
 describe("quadrantOf", () => {
-  it("classifies the three quadrants on the 0.7 / 0.5 thresholds", () => {
-    expect(quadrantOf(0.7, 0.49)).toBe("untapped");
-    expect(quadrantOf(0.7, 0.5)).toBe("established");
-    expect(quadrantOf(0.69, 0.1)).toBe("reach");
+  it("gates on affinity 0.5, then splits on the affinity - popularity gap of 0.02", () => {
+    expect(quadrantOf(0.52, 0.5)).toBe("untapped"); // gap exactly 0.02 (despite float error in 0.52 - 0.50)
+    expect(quadrantOf(0.51, 0.5)).toBe("established"); // gap 0.01
+    expect(quadrantOf(0.49, 0.1)).toBe("reach"); // below the gate, however large the gap
+  });
+  it("treats the gate as inclusive and ties as established", () => {
+    expect(quadrantOf(0.5, 0.48)).toBe("untapped");
+    expect(quadrantOf(0.5, 0.5)).toBe("established");
+    expect(quadrantOf(0.9, 0.9)).toBe("established");
+    expect(quadrantOf(0.9, 0.95)).toBe("established"); // more known than its fit
+  });
+  it("counts a primed city as untapped whatever its absolute popularity, if the gap holds", () => {
+    expect(quadrantOf(0.95, 0.9)).toBe("untapped");
+    expect(quadrantOf(0.7, 0.2)).toBe("untapped");
   });
 });
 

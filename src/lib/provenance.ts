@@ -4,10 +4,14 @@ import { suggestCapacity } from "./economics";
 
 type SourcePlan = Pick<Plan, "act" | "stops" | "provenance">;
 
+/**
+ * Live plans score cities from one region-wide heatmap query, so their values share a scale ("region-normalized").
+ * Mock cells are synthetic per city and unknown sources are unestablished, so both stay "unverified".
+ */
 export function createProvenance(dataMode: PlanProvenance["dataMode"]): PlanProvenance {
   return {
     dataMode,
-    heatmapComparability: "unverified",
+    heatmapComparability: dataMode === "live" ? "region-normalized" : "unverified",
     demographicsScope: "act-wide",
     similarityMethod: "derived-taste-similarity",
     scoringMethod: "heuristic-v1",
@@ -15,13 +19,18 @@ export function createProvenance(dataMode: PlanProvenance["dataMode"]): PlanProv
   };
 }
 
-/** Synthetic ids are positive evidence of mock data. The absence of such ids never establishes a live source. */
+/**
+ * Synthetic ids are positive evidence of mock data. The absence of such ids never establishes a live source.
+ * Comparability is the saved value when present (legacy plans without one, and anything synthetic, are "unverified");
+ * it is never upgraded from the data mode alone, so a live plan saved before the region heatmap stays unverified.
+ */
 export function provenanceFor(plan: SourcePlan): PlanProvenance {
   const synthetic = plan.act.id.startsWith("mock-") || plan.stops.some((stop) =>
     [...stop.openers, ...stop.sponsors, ...stop.places].some((pick) => pick.id.startsWith("mock-")),
   );
   const dataMode = synthetic ? "mock" : plan.provenance?.dataMode ?? "unknown";
-  return { ...createProvenance(dataMode), proseVersion: plan.provenance?.proseVersion };
+  const heatmapComparability = !synthetic && plan.provenance?.heatmapComparability === "region-normalized" ? "region-normalized" : "unverified";
+  return { ...createProvenance(dataMode), heatmapComparability, proseVersion: plan.provenance?.proseVersion };
 }
 
 export function safeStopCopy(plan: SourcePlan, stop: Stop): Pick<Stop, "suggestion" | "whyHere"> {
@@ -29,9 +38,12 @@ export function safeStopCopy(plan: SourcePlan, stop: Stop): Pick<Stop, "suggesti
   if (source.proseVersion === 2) return { suggestion: stop.suggestion, whyHere: stop.whyHere };
   const capacity = suggestCapacity(stop.city, plan.act.popularity ?? 0.5);
   const prefix = source.dataMode === "mock" ? "Synthetic example" : "Provisional heuristic candidate";
+  const scale = source.heatmapComparability === "region-normalized"
+    ? "Values come from one region-wide Qloo heatmap"
+    : "Cross-city comparability is unverified";
   return {
     suggestion: `Room-size assumption: ${capacity.toLocaleString("en-US")} capacity; validate demand before booking.`,
-    whyHere: `${prefix}: recorded affinity ${stop.city.affinity.toFixed(2)}, popularity ${stop.city.popularity.toFixed(2)}. Cross-city comparability is unverified; this does not establish ticket demand or booking history.`,
+    whyHere: `${prefix}: recorded affinity ${stop.city.affinity.toFixed(2)}, popularity ${stop.city.popularity.toFixed(2)}. ${scale}; this does not establish ticket demand or booking history.`,
   };
 }
 

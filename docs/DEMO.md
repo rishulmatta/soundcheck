@@ -27,7 +27,7 @@ Use one narrow case study. Secondary act categories can remain optional examples
 
 **Idea:** Cultural taste connects market research with potential support acts, brands, and activations. Add one verified example of a useful decision changed after live-data and user evaluation; synthetic results cannot fill this evidence gap.
 
-**Limits:** Geographic comparability remains unverified. The tool does not know booking history, actual demand, partner interest or availability. Similarity and economics are labeled interpretations.
+**Limits:** City scores come from one region-wide Qloo heatmap and are comparable within a plan, but the published examples are still synthetic. The tool does not know booking history, actual demand, partner interest or availability. Similarity and economics are labeled interpretations.
 
 ## Assets and release
 

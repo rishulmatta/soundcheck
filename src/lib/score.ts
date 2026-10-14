@@ -1,5 +1,11 @@
 /**
- * City scoring. Pure: turns per-city Qloo heatmap aggregates into CityScore rows for the quadrant chart and routing.
+ * City scoring. Pure: turns per-city aggregates of one region-wide Qloo heatmap into CityScore rows for the
+ * quadrant chart and routing.
+ *
+ * Scale (settled on key day, 2026-10-14): Qloo rank-normalizes heatmap affinity and popularity within each query,
+ * so per-city queries are not comparable (every city tops out at 1). The client therefore runs ONE heatmap query
+ * per region polygon and assigns cells to cities, so every city's affinity and popularity sit on the same 0..1
+ * scale over the region's cells. That is what makes the comparisons below meaningful.
  *
  * Formula (documented for the write-up):
  *   underserved = 0.6 * affinity + 0.4 * (1 - popularity)   when affinity >= 0.5
@@ -8,9 +14,12 @@
  * the act is unknown there: low popularity is only an opportunity when the taste graph says the audience is primed.
  *
  * Quadrant:
- *   untapped    = affinity >= 0.7 and popularity <  0.5   ("primed, untapped": the signature insight)
- *   established = affinity >= 0.7 and popularity >= 0.5
- *   reach       = everything else
+ *   reach       = affinity <  0.5                                  (the region's taste is not primed for the act)
+ *   untapped    = affinity >= 0.5 and affinity - popularity >= 0.02 (primed, and less known there than its fit suggests)
+ *   established = affinity >= 0.5 otherwise                        (primed, and already as known as its fit suggests)
+ * In region-normalized data affinity and popularity track each other closely for well-known acts, so "untapped" is
+ * defined by the gap between them, not by a fixed popularity ceiling. The 0.02 margin is two rounding units: enough
+ * to exclude ties, small enough that a modest gap counts. Sparse acts show gaps of 0.1-0.3 in live data.
  *
  * affinityRank is 1-based over the scored set, affinity descending (ties broken by lower popularity, then name).
  */
@@ -18,8 +27,8 @@ import type { CityHeatmap } from "@/lib/qloo/contract";
 import type { CityScore, Quadrant, ToolStatus } from "@/lib/types";
 
 export const AFFINITY_GATE = 0.5;
-export const QUADRANT_AFFINITY = 0.7;
-export const QUADRANT_POPULARITY = 0.5;
+/** Minimum affinity - popularity for "untapped". */
+export const UNTAPPED_GAP = 0.02;
 
 const clamp01 = (n: number) => (Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0);
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -32,8 +41,9 @@ export function underservedScore(affinity: number, popularity: number): number {
 }
 
 export function quadrantOf(affinity: number, popularity: number): Quadrant {
-  if (affinity >= QUADRANT_AFFINITY) return popularity < QUADRANT_POPULARITY ? "untapped" : "established";
-  return "reach";
+  if (affinity < AFFINITY_GATE) return "reach";
+  // Compare in hundredths so 0.52 - 0.50 is not 0.0199999 at the boundary.
+  return Math.round((affinity - popularity) * 100) >= Math.round(UNTAPPED_GAP * 100) ? "untapped" : "established";
 }
 
 /** Heatmaps may carry the envelope status of the call that produced them; it defaults to "ok". */

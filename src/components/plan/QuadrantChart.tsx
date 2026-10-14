@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { scaleLinear } from "d3-scale";
-import type { CityScore, Quadrant, Stop } from "@/lib/types";
+import type { CityScore, PlanProvenance, Quadrant, Stop } from "@/lib/types";
+import { AFFINITY_GATE, UNTAPPED_GAP } from "@/lib/score";
 import { QlooTag } from "@/components/ui/QlooTag";
 import { cn } from "@/components/ui/cn";
 import { stagger } from "@/components/ui/stagger";
@@ -43,14 +44,25 @@ interface Props {
   animate?: boolean;
   /** Draw the surrounding panel (title and border). */
   panel?: boolean;
+  /**
+   * The plan's heatmap comparability (provenanceFor(plan).heatmapComparability). "region-normalized" plans draw the
+   * scorer's real boundaries: the affinity gate and the affinity = popularity + gap diagonal. "unverified" plans (the
+   * saved demos, classified under the earlier rule) keep the split read from how their candidates were classified.
+   */
+  comparability?: PlanProvenance["heatmapComparability"];
   className?: string;
 }
 
-export function QuadrantChart({ candidates, stops = [], activeStop, selected = false, onHoverStop, onSelectStop, animate = true, panel = true, className }: Props) {
+export function QuadrantChart({ candidates, stops = [], activeStop, selected = false, onHoverStop, onSelectStop, animate = true, panel = true, comparability = "unverified", className }: Props) {
   const [localHover, setLocalHover] = useState<string | undefined>();
+  const diagonal = comparability === "region-normalized";
   const x = useMemo(() => scaleLinear().domain([0, 1]).range([M.left, W - M.right]), []);
-  // The y axis starts just under the lowest affinity so the cells are not squashed into the top third.
-  const yLo = useMemo(() => Math.max(0, Math.floor((Math.min(...candidates.map((c) => c.affinity), 1) - 0.08) * 10) / 10), [candidates]);
+  // The y axis starts just under the lowest affinity so the cells are not squashed into the top third. With the
+  // diagonal boundary it never starts above 0.4, so the affinity gate (and the reach band under it) stays visible.
+  const yLo = useMemo(() => {
+    const lo = Math.max(0, Math.floor((Math.min(...candidates.map((c) => c.affinity), 1) - 0.08) * 10) / 10);
+    return diagonal ? Math.min(lo, AFFINITY_GATE - 0.1) : lo;
+  }, [candidates, diagonal]);
   const y = useMemo(() => scaleLinear().domain([yLo, 1.04]).range([H - M.bottom, M.top]), [yLo]);
   const cut = useMemo(() => splits(candidates), [candidates]);
   const orderById = useMemo(() => new Map(stops.map((s) => [s.city.id, s.order])), [stops]);
@@ -59,6 +71,20 @@ export function QuadrantChart({ candidates, stops = [], activeStop, selected = f
   const sx = x(cut.pop);
   const sy = y(cut.aff);
   const untappedCount = candidates.filter((c) => c.quadrant === "untapped").length;
+
+  // Region-normalized boundary: untapped is affinity >= gate and affinity - popularity >= gap, i.e. above the gate
+  // line and left of the diagonal affinity = popularity + gap. The diagonal runs from the gate to the right edge.
+  const yTop = y.domain()[1];
+  const gateY = y(AFFINITY_GATE);
+  const diagStart = { x: x(AFFINITY_GATE - UNTAPPED_GAP), y: gateY };
+  const diagEnd = { x: x(1), y: y(Math.min(yTop, 1 + UNTAPPED_GAP)) };
+  const untappedArea = [
+    [M.left, gateY],
+    [diagStart.x, diagStart.y],
+    [diagEnd.x, diagEnd.y],
+    [x(1), y(yTop)],
+    [M.left, y(yTop)],
+  ].map((p) => p.join(",")).join(" ");
 
   // Draw order: reach, established, untapped, so the interesting dots sit on top.
   const rank: Record<Quadrant, number> = { reach: 0, established: 1, untapped: 2 };
@@ -86,26 +112,53 @@ export function QuadrantChart({ candidates, stops = [], activeStop, selected = f
   }, [candidates, activeId, orderById, x, y]);
 
   const svg = (
-    <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="group" aria-label={`Affinity against popularity for ${candidates.length} candidate cities. ${untappedCount} have higher affinity with lower popularity. Cross-city comparisons are provisional.`}>
-      {/* Highlighted cell ground fades in first. */}
-      <rect x={M.left} y={M.top} width={sx - M.left} height={sy - M.top} fill="var(--signal-soft)" className={animate ? "sc-fade" : undefined} />
+    <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="group" aria-label={
+      diagonal
+        ? `Affinity against popularity for ${candidates.length} candidate cities from one region-wide heatmap. ${untappedCount} are primed and less known than their fit suggests.`
+        : `Affinity against popularity for ${candidates.length} candidate cities. ${untappedCount} have higher affinity with lower popularity. Cross-city comparisons are provisional.`
+    }>
+      {/* Highlighted ground fades in first. */}
+      {diagonal ? (
+        <polygon points={untappedArea} fill="var(--signal-soft)" className={animate ? "sc-fade" : undefined} />
+      ) : (
+        <rect x={M.left} y={M.top} width={sx - M.left} height={sy - M.top} fill="var(--signal-soft)" className={animate ? "sc-fade" : undefined} />
+      )}
       <line x1={M.left} y1={H - M.bottom} x2={W - M.right} y2={H - M.bottom} stroke="var(--line-strong)" />
       <line x1={M.left} y1={M.top} x2={M.left} y2={H - M.bottom} stroke="var(--line-strong)" />
-      <line x1={sx} y1={M.top} x2={sx} y2={H - M.bottom} stroke="var(--line)" strokeDasharray="3 3" />
-      <line x1={M.left} y1={sy} x2={W - M.right} y2={sy} stroke="var(--line)" strokeDasharray="3 3" />
+      {diagonal ? (
+        <>
+          <line x1={M.left} y1={gateY} x2={W - M.right} y2={gateY} stroke="var(--line)" strokeDasharray="3 3" />
+          <line x1={diagStart.x} y1={diagStart.y} x2={diagEnd.x} y2={diagEnd.y} stroke="var(--line)" strokeDasharray="3 3" />
+        </>
+      ) : (
+        <>
+          <line x1={sx} y1={M.top} x2={sx} y2={H - M.bottom} stroke="var(--line)" strokeDasharray="3 3" />
+          <line x1={M.left} y1={sy} x2={W - M.right} y2={sy} stroke="var(--line)" strokeDasharray="3 3" />
+        </>
+      )}
 
       {[0, 0.5, 1].map((t) => (
         <text key={`x${t}`} x={x(t)} y={H - M.bottom + 14} textAnchor="middle" className="num" fontSize="11" fill="var(--ink-muted)">{t === 0 ? "0" : t.toFixed(1)}</text>
       ))}
-      {[0.2, 0.4, 0.6, 0.8, 1].filter((t) => t >= yLo + 0.05).map((t) => (
+      {(diagonal ? [0.2, 0.4, AFFINITY_GATE, 0.6, 0.8, 1] : [0.2, 0.4, 0.6, 0.8, 1]).filter((t) => t >= yLo + 0.05).map((t) => (
         <text key={`y${t}`} x={M.left - 6} y={y(t) + 4} textAnchor="end" className="num" fontSize="11" fill="var(--ink-muted)">{t.toFixed(1)}</text>
       ))}
 
       <g fontFamily="var(--font-sans)" fontSize="10" fontWeight="600" letterSpacing="0.08em">
-        <text x={M.left + 8} y={M.top + 16} fill="var(--signal)">INVESTIGATE</text>
-        <text x={sx + 8} y={M.top + 16} fill="var(--ink-muted)">HIGHER SIGNALS</text>
-        <text x={M.left + 8} y={H - M.bottom - 8} fill="var(--ink-faint)">LOWER AFFINITY</text>
-        <text x={sx + 8} y={H - M.bottom - 8} fill="var(--ink-faint)">LOWER AFFINITY</text>
+        {diagonal ? (
+          <>
+            <text x={M.left + 8} y={M.top + 16} fill="var(--signal)">INVESTIGATE</text>
+            <text x={W - M.right - 8} y={gateY - 8} textAnchor="end" fill="var(--ink-muted)">HIGHER SIGNALS</text>
+            <text x={M.left + 8} y={H - M.bottom - 8} fill="var(--ink-faint)">LOWER AFFINITY</text>
+          </>
+        ) : (
+          <>
+            <text x={M.left + 8} y={M.top + 16} fill="var(--signal)">INVESTIGATE</text>
+            <text x={sx + 8} y={M.top + 16} fill="var(--ink-muted)">HIGHER SIGNALS</text>
+            <text x={M.left + 8} y={H - M.bottom - 8} fill="var(--ink-faint)">LOWER AFFINITY</text>
+            <text x={sx + 8} y={H - M.bottom - 8} fill="var(--ink-faint)">LOWER AFFINITY</text>
+          </>
+        )}
       </g>
       <text x={W - M.right} y={H - 6} textAnchor="end" className="num" fontSize="11" fill="var(--ink-muted)">popularity →</text>
       <text transform={`rotate(-90 12 ${M.top})`} x={12} y={M.top} textAnchor="end" className="num" fontSize="11" fill="var(--ink-muted)">affinity →</text>
@@ -190,7 +243,9 @@ export function QuadrantChart({ candidates, stops = [], activeStop, selected = f
         <QlooTag />
       </div>
       <p className="mb-3 text-[13px] leading-[18px] text-ink-muted">
-        {candidates.length} cities, with provisional affinity and popularity scores. Top left means higher affinity and lower popularity; no booking history is available.
+        {diagonal
+          ? `${candidates.length} cities from one region-wide Qloo heatmap. Above the dashed line the taste is primed for the act; left of the diagonal it is less known than that fit suggests. No booking history is available.`
+          : `${candidates.length} cities, with provisional affinity and popularity scores. Top left means higher affinity and lower popularity; no booking history is available.`}
       </p>
       {svg}
     </section>

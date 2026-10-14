@@ -2,7 +2,7 @@
  * The Qloo tool contract. Implemented in src/lib/qloo (live client + mock), consumed by src/lib/agent.
  * Every method returns a ToolResult envelope; nothing throws on thin data. Only network/auth failures become status "error".
  */
-import type { ActLink, ActType, CityPoolEntry, ToolResult } from "@/lib/types";
+import type { ActLink, ActType, CityPoolEntry, Region, ToolResult } from "@/lib/types";
 
 export interface EntityCandidate {
   id: string;
@@ -24,11 +24,26 @@ export interface TagRef { id: string; name: string; type?: string }
 export interface HeatmapCell { lat: number; lon: number; affinity: number; affinityRank: number; popularity: number }
 export interface CityHeatmap {
   city: CityPoolEntry;
-  /** Aggregate for the city: mean of the top cells, or the single locality value. */
+  /** Aggregate for the city: mean of its top cells (by affinity) within CITY_CELL_RADIUS_KM of the centroid. */
   affinity: number;
   affinityRank: number;
   popularity: number;
+  /** The region cells assigned to this city. Empty when none fell within reach (a thin city). */
   cells: HeatmapCell[];
+}
+
+/**
+ * One region-wide heatmap, cut up by city. Qloo rank-normalizes affinity and popularity within each query, so this
+ * is the only shape whose city values are comparable with one another (settled on key day, 2026-10-14).
+ */
+export interface RegionHeatmap {
+  region: Region;
+  /** WKT polygon sent as filter.location. */
+  polygon: string;
+  /** Cells Qloo returned for the polygon before assignment to cities. */
+  cellCount: number;
+  /** One row per requested city, in request order. Cities with no cells in reach have empty cells and zero values. */
+  cities: CityHeatmap[];
 }
 
 export interface DemographicsData {
@@ -64,8 +79,14 @@ export interface QlooClient {
   searchEntity(query: string, type: ActType): Promise<ToolResult<EntityCandidate[]>>;
   /** GET /v2/tags */
   findTags(query: string, opts?: { typeHint?: string }): Promise<ToolResult<TagRef[]>>;
-  /** GET /v2/insights?filter.type=urn:heatmap for one city, seeded by the act (or by tags when the act is thin). */
-  heatmapForCity(seed: { entityIds?: string[]; tagIds?: string[] }, city: CityPoolEntry): Promise<ToolResult<CityHeatmap>>;
+  /**
+   * GET /v2/insights?filter.type=urn:heatmap&filter.location=<region WKT polygon>, seeded by the act (or by tags when
+   * the act is thin), with the returned cells assigned to the requested cities by proximity. One call per region.
+   * Status: ok when every city got cells; partial when some got none (meta.note names them); empty when the region
+   * returned no cells, or none within reach of any requested city; degraded when the tag seed had to stand in for
+   * the act. The data always carries one row per requested city.
+   */
+  heatmapForCities(seed: { entityIds?: string[]; tagIds?: string[] }, cities: CityPoolEntry[], region: Region): Promise<ToolResult<RegionHeatmap>>;
   /** GET /v2/insights?filter.type=urn:demographics, optionally localized. */
   demographics(seed: { entityIds?: string[]; tagIds?: string[] }, opts?: { locationQuery?: string }): Promise<ToolResult<DemographicsData>>;
   /** GET /v2/trending */

@@ -9,14 +9,16 @@ describe("redactRequest", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it("renders the heatmap trace exactly as the agent trace expects", () => {
-    const url = `https://hackathon.api.qloo.com/v2/insights?filter.type=urn:heatmap&filter.location.query=Boise&signal.interests.entities=${ACT}`;
-    expect(redactRequest(url)).toBe("GET /v2/insights?filter.type=urn:heatmap&filter.location.query=Boise&signal.interests.entities=[act]");
+    const url = `https://hackathon.api.qloo.com/v2/insights?filter.type=urn:heatmap&filter.location=POLYGON((-125%2028,-62%2028,-62%2053,-125%2053,-125%2028))&signal.interests.entities=${ACT}`;
+    expect(redactRequest(url)).toBe(
+      "GET /v2/insights?filter.type=urn:heatmap&filter.location=POLYGON((-125%2028,-62%2028,-62%2053,-125%2053,-125%2028))&signal.interests.entities=[act]",
+    );
   });
 
-  it("matches the builder output for the heatmap call", () => {
-    const req = qlooRequests.heatmap({ entityIds: [ACT] }, "Boise");
+  it("matches the builder output for the region heatmap call", () => {
+    const req = qlooRequests.heatmap({ entityIds: [ACT] }, "POLYGON((-125 28,-62 28,-62 53,-125 53,-125 28))");
     expect(redactParts(req.path, req.params, { actIds: [ACT] })).toBe(
-      "GET /v2/insights?filter.type=urn:heatmap&filter.location.query=Boise&signal.interests.entities=[act]&take=50",
+      "GET /v2/insights?filter.type=urn:heatmap&filter.location=POLYGON((-125%2028,-62%2028,-62%2053,-125%2053,-125%2028))&signal.interests.entities=[act]",
     );
   });
 

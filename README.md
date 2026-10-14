@@ -6,7 +6,7 @@ Soundcheck turns an act and a touring brief into candidate cities, a route, pote
 
 [Open the app](https://soundcheck-amber-two.vercel.app) · [Musician example](https://soundcheck-amber-two.vercel.app/plan/demo-musician) · [Demo script](docs/DEMO.md)
 
-**Evidence status:** development and published examples have used synthetic Qloo fixtures while the API key is pending. They demonstrate the workflow, not real market findings. Plans display source provenance; unrecorded legacy provenance is treated conservatively. Live geographic comparability and user usefulness have not been validated.
+**Evidence status:** new plans run against the live Qloo API (key received October 14, 2026). The three published examples were generated earlier from synthetic Qloo fixtures and are kept as workflow demos; their banner says so. Plans display source provenance; unrecorded legacy provenance is treated conservatively. Live heatmap semantics were validated on key day (see `docs/VALIDATION.md`); user usefulness has not been.
 
 ## Try it
 
@@ -24,7 +24,7 @@ The primary experience is musician tour research. Comedian and podcast examples 
 | --- | --- | --- |
 | Which act? | Entity search | Resolve identity; ambiguity can require external confirmation. |
 | What tastes? | Taste tags and tag search | Support interpretation and sparse-data fallback. |
-| Which markets? | Geographic heatmaps | Cross-query comparability and aggregation need validation; rankings are provisional. |
+| Which markets? | Geographic heatmaps | One region-wide heatmap per plan, so city affinity and popularity share a scale; still not demand, booking history or venue availability. |
 | Which audience? | Demographics and trending | Act-wide audience profile and momentum, not city-specific demand. |
 | Which support acts? | Related entities and comparison | Derived taste similarity, not shared-fan percentage. |
 | Which partners? | Brand and place insights | Cultural-fit candidates, not confirmed interest or available venues. |

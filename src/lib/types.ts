@@ -223,8 +223,11 @@ export type TraceStep = z.infer<typeof TraceStep>;
 
 export const PlanProvenance = z.object({
   dataMode: z.enum(["mock", "live", "unknown"]),
-  /** No live API contract/response validation has established cross-city comparability yet. */
-  heatmapComparability: z.literal("unverified"),
+  /**
+   * "region-normalized": city values come from one region-wide heatmap query, so they share a scale (live client,
+   * verified 2026-10-14). "unverified": synthetic per-city cells (mock) or a plan saved before the switch.
+   */
+  heatmapComparability: z.enum(["unverified", "region-normalized"]),
   demographicsScope: z.literal("act-wide"),
   similarityMethod: z.literal("derived-taste-similarity"),
   scoringMethod: z.literal("heuristic-v1"),
