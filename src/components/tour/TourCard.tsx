@@ -13,6 +13,9 @@ export type CardPhase = "hidden" | "out" | "card" | "detail" | "hold";
 
 export const COUNT_UP_MS = 500;
 
+/** Same wording as CityCard's opener rows; kept here so the tour bundle does not pull in the plan card. */
+const OPENER_POPULARITY_TITLE = "Qloo popularity percentile of the act's cultural presence, not ticket draw; openers are capped below the headliner";
+
 const rowStyle = (i: number) => ({ "--i": i }) as CSSProperties;
 
 /**
@@ -100,6 +103,11 @@ export function TourCard({ plan, stop, pool, phase, reducedMotion }: { plan: Pla
             <span>
               {opener.name}
               {opener.tasteSimilarity !== undefined && <span className="num ml-2 text-xs text-ink-muted">derived taste similarity {opener.tasteSimilarity.toFixed(2)}</span>}
+              {opener.popularity !== undefined && (
+                <span className="num ml-2 whitespace-nowrap text-xs text-ink-muted" title={OPENER_POPULARITY_TITLE}>
+                  pop {opener.popularity.toFixed(2)}
+                </span>
+              )}
             </span>
           </div>
         )}

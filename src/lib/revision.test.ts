@@ -76,6 +76,16 @@ describe("applyChanges", () => {
     expect(out).toMatchObject({ stops: 8, window: "Mar–Apr 2027", budgetTier: "van" });
   });
 
+  it("applies a room tier and keeps the parent's when the change-set has none", () => {
+    expect(applyChanges(input, changes({ roomTier: "800to2000" }), pool).roomTier).toBe("800to2000");
+    expect(applyChanges(input, EMPTY_CHANGES, pool).roomTier).toBeUndefined();
+    const stated = { ...input, roomTier: "300to800" as const };
+    expect(applyChanges(stated, changes({ stops: 6 }), pool).roomTier).toBe("300to800");
+    expect(applyChanges(stated, changes({ roomTier: "under300" }), pool).roomTier).toBe("under300");
+    // A room tier is not a city-set change: the manual order survives it.
+    expect(applyChanges(input, changes({ roomTier: "over5000" }), pool).order).toEqual(route);
+  });
+
   it("clears the manual order when the city set changes, keeps it otherwise", () => {
     expect(applyChanges(input, changes({ drop: ["boise"] }), pool).order).toBeUndefined();
     expect(applyChanges(input, changes({ restore: ["tulsa"] }), pool).order).toBeUndefined();
@@ -122,9 +132,16 @@ describe("mergeChanges", () => {
     expect(mergeChanges(changes({ order }), changes({ order: route })).order).toEqual(route);
   });
 
+  it("lets a later room tier win and keeps an earlier one otherwise", () => {
+    expect(mergeChanges(changes({ roomTier: "300to800" }), changes({ roomTier: "800to2000" })).roomTier).toBe("800to2000");
+    expect(mergeChanges(changes({ roomTier: "300to800" }), changes({ stops: 6 })).roomTier).toBe("300to800");
+    expect(mergeChanges(EMPTY_CHANGES, changes({ roomTier: "over5000" })).roomTier).toBe("over5000");
+  });
+
   it("merging empties stays empty", () => {
     expect(isEmptyChangeSet(mergeChanges(EMPTY_CHANGES, EMPTY_CHANGES))).toBe(true);
     expect(isEmptyChangeSet(changes({ window: "Spring" }))).toBe(false);
+    expect(isEmptyChangeSet(changes({ roomTier: "under300" }))).toBe(false);
   });
 });
 
@@ -139,6 +156,13 @@ describe("describeChanges / revisionNote", () => {
     const lines = describeChanges(changes({ stops: 8, window: "Mar 2027", budgetTier: "van" }), plan, pool);
     expect(lines.map((l) => l.text)).toEqual(["Stops 5 → 8", "Window unset → Mar 2027", "Budget bus → van"]);
     expect(describeChanges(changes({ stops: 5, budgetTier: "bus" }), plan, pool)).toEqual([]);
+  });
+
+  it("describes a room tier change from the stated tier, or from the guess", () => {
+    const stated = { ...plan, input: { ...input, roomTier: "300to800" as const } };
+    expect(describeChanges(changes({ roomTier: "800to2000" }), stated, pool)).toEqual([{ kind: "roomTier", text: "Room tier 300 to 800 → 800 to 2,000" }]);
+    expect(describeChanges(changes({ roomTier: "300to800" }), stated, pool)).toEqual([]);
+    expect(describeChanges(changes({ roomTier: "over5000" }), plan, pool)[0].text).toBe("Room tier guessed → Over 5,000");
   });
 
   it("summarises a reorder by the stops that moved", () => {
@@ -165,6 +189,7 @@ describe("isReorderOnly", () => {
     expect(isReorderOnly(changes({ order: swapped, lock: ["austin"] }), plan)).toBe(false);
     expect(isReorderOnly(changes({ order: swapped, window: "Spring" }), plan)).toBe(false);
     expect(isReorderOnly(changes({ order: swapped, budgetTier: "van" }), plan)).toBe(false);
+    expect(isReorderOnly(changes({ order: swapped, roomTier: "800to2000" }), plan)).toBe(false);
     expect(isReorderOnly(changes({ order: swapped.slice(0, 4) }), plan)).toBe(false);
     expect(isReorderOnly(changes({ order: [...swapped.slice(0, 4), "austin"] }), plan)).toBe(false);
   });

@@ -50,15 +50,18 @@ function Group({ label, qloo = true, children }: { label: string; qloo?: boolean
   );
 }
 
+const OPENER_POPULARITY_TITLE = "Qloo popularity percentile of the act's cultural presence, not ticket draw; openers are capped below the headliner";
+
 function PickRows({ picks, kind, showSimilarity, print, plan }: { picks: Pick[]; kind: string; showSimilarity?: boolean; print?: boolean; plan?: Plan }) {
   return (
     <ul>
       {picks.map((p) => (
         <li key={p.id} className="border-b border-line py-1.5 last:border-b-0">
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="text-[15px] leading-[22px]">{p.name}</span>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+            <span className="min-w-0 text-[15px] leading-[22px]">{p.name}</span>
             <span className="flex shrink-0 items-baseline gap-2">
               {showSimilarity && p.tasteSimilarity !== undefined && <span className="num text-[13px] leading-[18px] text-ink-muted" title="Soundcheck-derived taste similarity on a 0–1 scale; not audience overlap">taste similarity {p.tasteSimilarity.toFixed(2)}</span>}
+              {showSimilarity && p.popularity !== undefined && <span className="num text-[13px] leading-[18px] text-ink-muted" title={OPENER_POPULARITY_TITLE}>popularity {p.popularity.toFixed(2)}</span>}
               {!print && <WhyPopover title={`${kind} ${p.name}`} reason={plan ? safePickReason(plan, p) : p.reason} tags={p.tags} />}
             </span>
           </div>

@@ -6,6 +6,7 @@
  * set, and the parent keeps its share link. See src/lib/agent/run.ts for how a revision run reuses the parent.
  */
 import { legDaysAlong, matchesCity } from "@/lib/routing";
+import { ROOM_TIERS } from "@/lib/room";
 import type { ChangeSet, CityPoolEntry, Plan, PlanInput, Stop } from "@/lib/types";
 
 export const EMPTY_CHANGES: ChangeSet = { lock: [], unlock: [], drop: [], restore: [] };
@@ -21,6 +22,7 @@ export function isEmptyChangeSet(c: ChangeSet): boolean {
     c.stops === undefined &&
     c.window === undefined &&
     c.budgetTier === undefined &&
+    c.roomTier === undefined &&
     c.order === undefined
   );
 }
@@ -39,6 +41,7 @@ export function mergeChanges(a: ChangeSet, b: ChangeSet): ChangeSet {
     stops: b.stops ?? a.stops,
     window: b.window ?? a.window,
     budgetTier: b.budgetTier ?? a.budgetTier,
+    roomTier: b.roomTier ?? a.roomTier,
     // A city-set change invalidates a manual order (the router can no longer honour it).
     order: b.order ?? (b.drop.length || b.restore.length || b.stops !== undefined ? undefined : a.order),
   };
@@ -74,12 +77,13 @@ export function applyChanges(input: PlanInput, c: ChangeSet, pool: Pick<CityPool
     stops: c.stops ?? input.stops,
     window: c.window ?? input.window,
     budgetTier: c.budgetTier ?? input.budgetTier,
+    roomTier: c.roomTier ?? input.roomTier,
     order: order && order.length ? order : undefined,
   };
 }
 
 export interface ChangeLine {
-  kind: "lock" | "unlock" | "drop" | "restore" | "stops" | "window" | "budgetTier" | "order";
+  kind: "lock" | "unlock" | "drop" | "restore" | "stops" | "window" | "budgetTier" | "roomTier" | "order";
   text: string;
 }
 
@@ -94,6 +98,10 @@ export function describeChanges(c: ChangeSet, plan: Pick<Plan, "input" | "stops"
   if (c.stops !== undefined && c.stops !== plan.input.stops) out.push({ kind: "stops", text: `Stops ${plan.input.stops} → ${c.stops}` });
   if (c.window !== undefined && c.window !== plan.input.window) out.push({ kind: "window", text: `Window ${plan.input.window ?? "unset"} → ${c.window}` });
   if (c.budgetTier !== undefined && c.budgetTier !== plan.input.budgetTier) out.push({ kind: "budgetTier", text: `Budget ${plan.input.budgetTier} → ${c.budgetTier}` });
+  if (c.roomTier !== undefined && c.roomTier !== plan.input.roomTier) {
+    const from = plan.input.roomTier ? ROOM_TIERS[plan.input.roomTier].label : "guessed";
+    out.push({ kind: "roomTier", text: `Room tier ${from} → ${ROOM_TIERS[c.roomTier].label}` });
+  }
   if (c.order) {
     const current = plan.stops.map((s) => s.city.id);
     if (c.order.join("|") !== current.join("|")) {
@@ -116,7 +124,7 @@ export function isReorderOnly(c: ChangeSet, plan: Pick<Plan, "stops">): boolean 
   if (!c.order) return false;
   const current = plan.stops.map((s) => s.city.id);
   const same = c.order.length === current.length && current.every((id) => c.order!.includes(id));
-  return same && !c.lock.length && !c.unlock.length && !c.drop.length && !c.restore.length && c.stops === undefined && c.window === undefined && c.budgetTier === undefined;
+  return same && !c.lock.length && !c.unlock.length && !c.drop.length && !c.restore.length && c.stops === undefined && c.window === undefined && c.budgetTier === undefined && c.roomTier === undefined;
 }
 
 /**

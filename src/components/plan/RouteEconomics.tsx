@@ -2,7 +2,8 @@
 
 import { useId, useMemo, useState } from "react";
 import type { BudgetTier, PlanInput, Region, Stop } from "@/lib/types";
-import { BUDGET_TIER_LABEL, formatInt, formatMoney, ratesFor, routeEconomics, stopBreakEven, unitsFor, type BreakEven, type Rates, type RouteEconomics as Econ, type Units } from "@/lib/economics";
+import { BUDGET_TIER_LABEL, capacityBasis, formatInt, formatMoney, ratesFor, routeEconomics, stopBreakEven, unitsFor, type BreakEven, type Rates, type RouteEconomics as Econ, type Units } from "@/lib/economics";
+import { resolveRoomTier, type ResolvedRoomTier } from "@/lib/room";
 import { StopMarker } from "@/components/ui/StopMarker";
 import { cn } from "@/components/ui/cn";
 
@@ -11,6 +12,8 @@ export interface EconomicsState {
   rates: Rates;
   units: Units;
   economics: Econ;
+  /** The room tier every suggested capacity is anchored on: stated in the brief, or guessed from act popularity. */
+  room: ResolvedRoomTier;
   /** Break-even per stop order, computed once for every card. */
   breakEven: Map<number, BreakEven>;
   setTier: (t: BudgetTier) => void;
@@ -21,7 +24,7 @@ export interface EconomicsState {
 
 interface EconInput {
   /** Absent only on the run page before the input is known. */
-  input?: Pick<PlanInput, "budgetTier" | "region">;
+  input?: Pick<PlanInput, "budgetTier" | "region" | "roomTier">;
   stops: Stop[];
   act?: { popularity?: number };
 }
@@ -31,21 +34,24 @@ export function useEconomics(plan: EconInput): EconomicsState {
   const initial = plan.input?.budgetTier ?? "bus";
   const region = plan.input?.region ?? "north-america";
   const actPopularity = plan.act?.popularity;
+  const roomTier = plan.input?.roomTier;
+  const room = useMemo(() => resolveRoomTier({ roomTier }, actPopularity), [roomTier, actPopularity]);
   const units = useMemo(() => unitsFor(region), [region]);
   const [tier, setTierState] = useState<BudgetTier>(initial);
   const [rates, setRates] = useState<Rates>(() => ratesFor(initial, units));
   const economics = useMemo(() => routeEconomics(plan.stops, rates, units.unit), [plan.stops, rates, units.unit]);
   const breakEven = useMemo(() => {
     const m = new Map<number, BreakEven>();
-    for (const s of plan.stops) m.set(s.order, stopBreakEven(s, actPopularity, rates, economics.legs.find((l) => l.to === s.order)));
+    for (const s of plan.stops) m.set(s.order, stopBreakEven(s, room, rates, economics.legs.find((l) => l.to === s.order)));
     return m;
-  }, [plan.stops, actPopularity, rates, economics.legs]);
+  }, [plan.stops, room, rates, economics.legs]);
   const edited = JSON.stringify(rates) !== JSON.stringify(ratesFor(tier, units));
   return {
     tier,
     rates,
     units,
     economics,
+    room,
     breakEven,
     setTier: (t) => {
       setTierState(t);
@@ -90,7 +96,7 @@ export function BreakEvenLine({ b, units, rates }: { b: BreakEven; units: Units;
 interface StripProps {
   stops: Stop[];
   region: Region;
-  state: Pick<EconomicsState, "tier" | "rates" | "units" | "economics"> & Partial<Pick<EconomicsState, "setTier" | "setRate" | "reset" | "edited">>;
+  state: Pick<EconomicsState, "tier" | "rates" | "units" | "economics"> & Partial<Pick<EconomicsState, "room" | "setTier" | "setRate" | "reset" | "edited">>;
   /** Print: assumptions as text, no inputs. */
   editable?: boolean;
   hoveredStop?: number;
@@ -208,6 +214,12 @@ export function RouteEconomicsStrip({ stops, state, editable = true, hoveredStop
       ) : (
         <p className="mt-4 text-[13px] leading-[18px] text-ink-muted">
           Assumptions: {BUDGET_TIER_LABEL[tier]} · {rate(rates.perUnit, units)}/{unitLabel} · {money(rates.perDay, units)}/day · {rates.crew} crew · {money(rates.avgTicket, units)} ticket · legs over {formatInt(rates.flightLeg)} {unitLabel} flown.
+        </p>
+      )}
+
+      {state.room && (
+        <p className="mt-3 max-w-[80ch] text-[13px] leading-[18px] text-ink-muted">
+          <span className="font-semibold text-ink">Room sizes.</span> {capacityBasis(state.room)}.
         </p>
       )}
 

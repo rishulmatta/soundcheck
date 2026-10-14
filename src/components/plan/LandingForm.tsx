@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
-import { ActType, BudgetTier, PlanInput, Region } from "@/lib/types";
+import { ActType, BudgetTier, PlanInput, Region, RoomTier } from "@/lib/types";
 import { BUDGET_TIER_HINT, BUDGET_TIER_LABEL } from "@/lib/economics";
+import { ROOM_TIERS, ROOM_TIER_ORDER } from "@/lib/room";
 import { Button } from "@/components/ui/Button";
 import { ArrowRight } from "@/components/ui/icons";
 import { MonthRangePicker } from "@/components/ui/MonthRangePicker";
@@ -51,6 +52,8 @@ export function LandingForm() {
   const [locked, setLocked] = useState("");
   const [excluded, setExcluded] = useState("");
   const [budgetTier, setBudgetTier] = useState<string>("bus");
+  /** "" lets Soundcheck guess the tier from Qloo popularity. */
+  const [roomTier, setRoomTier] = useState<string>("");
   const [error, setError] = useState<string | undefined>();
 
   const id = (n: string) => `${uid}-${n}`;
@@ -66,6 +69,7 @@ export function LandingForm() {
       lockedCities: list(locked),
       excludedCities: list(excluded),
       budgetTier: BudgetTier.safeParse(budgetTier).data,
+      roomTier: RoomTier.safeParse(roomTier).data,
     });
     if (!parsed.success) {
       const first = parsed.error.issues[0];
@@ -83,14 +87,22 @@ export function LandingForm() {
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-5 rounded-md border border-line bg-bg-raised p-5 sm:p-6">
-      <div className="grid gap-5 md:grid-cols-[1fr_260px]">
-        <Field label="Act" htmlFor={id("act")}>
+      <div className="grid gap-5 sm:grid-cols-2 md:grid-cols-[minmax(0,1fr)_220px_minmax(0,1fr)]">
+        <Field label="Act" htmlFor={id("act")} className="sm:col-span-2 md:col-span-1">
           <input id={id("act")} className={fieldCls} value={actQuery} onChange={(e) => setActQuery(e.target.value)} placeholder="Name a musician or band…" autoComplete="off" aria-invalid={error ? true : undefined} />
         </Field>
         <Field label="Type" htmlFor={id("type")} hint="Musicians are the focus. Other live-act types are experimental.">
           <Select id={id("type")} value={actType} onChange={setActType}>
             {ActType.options.map((o) => (
               <option key={o} value={o} disabled={["book", "video_game", "brand"].includes(o)}>{ACT_TYPE_OPTION[o]}{o === "artist" ? "" : ["person", "podcast"].includes(o) ? " · experimental" : " · coming later"}</option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Current room size" htmlFor={id("room")} hint="The rooms the act plays today. Soundcheck moves each stop up or down from this; Qloo cannot tell room sizes apart.">
+          <Select id={id("room")} value={roomTier} onChange={setRoomTier}>
+            <option value="">Let Soundcheck guess from Qloo popularity</option>
+            {ROOM_TIER_ORDER.map((t) => (
+              <option key={t} value={t}>{ROOM_TIERS[t].label}</option>
             ))}
           </Select>
         </Field>

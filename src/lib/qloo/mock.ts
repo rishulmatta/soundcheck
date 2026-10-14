@@ -13,6 +13,7 @@
  *  - Region heatmap cells are synthesized per (seed, city), so a city's values do not depend on the rest of the set
  *    (unlike live, where the polygon's normalization does).
  *  - City affinity and popularity are spread so a 16-40 city pool lands dots in every quadrant.
+ *  - Related acts given an opener popularity band get popularities inside it (as the live filter returns).
  */
 import type { ActType, CityPoolEntry, Region, ToolResult, ToolStatus } from "@/lib/types";
 import { regionPolygonWkt } from "@/lib/geo";
@@ -29,7 +30,7 @@ import type {
   TrendingData,
 } from "./contract";
 import type { QlooRequest } from "./client";
-import { heatmapCoverage, qlooRequests, trendingWindow, type Seed } from "./live";
+import { heatmapCoverage, openerBandNote, qlooRequests, trendingWindow, type Seed } from "./live";
 import { redactParts, type RedactContext } from "./redact";
 import { aggregateHeatmap, AGE_BUCKETS, toTrending } from "./schemas";
 
@@ -285,10 +286,11 @@ export class MockQlooClient implements QlooClient {
   async relatedActs(
     entityId: string,
     type: ActType,
-    opts: { locationQuery?: string; take?: number; explain?: boolean },
+    opts: { locationQuery?: string; take?: number; explain?: boolean; popularity?: { min: number; max: number } },
   ): Promise<ToolResult<RelatedEntity[]>> {
     const take = Math.min(50, Math.max(1, opts.take ?? 10));
     const req = qlooRequests.related(entityId, type, { ...opts, take });
+    const band = opts.popularity;
     const ctx = { actIds: [entityId] };
     if (isUnknown(entityId)) return this.envelope("empty", [], req, ctx, "no related acts");
     const rand = seededRandom(`related|${entityId}|${opts.locationQuery ?? ""}`);
@@ -300,14 +302,16 @@ export class MockQlooClient implements QlooClient {
         id: mockEntityId(type, name),
         name,
         type: `urn:entity:${type}`,
-        popularity: r2(0.2 + rand() * 0.6),
+        // Same draw either way, so names and affinities do not change when a band is passed.
+        popularity: band ? bandPopularity(band, rand()) : r2(0.2 + rand() * 0.6),
         affinity,
         tags: pickDistinct(rand, TASTE[type], 2),
         explanation: opts.explain ? explain(rand, affinity, opts.locationQuery) : undefined,
       } satisfies RelatedEntity;
     });
     const status: ToolStatus = n < take ? "partial" : "ok";
-    return this.envelope(status, data, req, ctx, status === "partial" ? `${n} of ${take} requested` : undefined);
+    const notes = [status === "partial" ? `${n} of ${take} requested` : undefined, band ? openerBandNote(band) : undefined].filter(Boolean);
+    return this.envelope(status, data, req, ctx, notes.join("; ") || undefined);
   }
 
   async compareAudiences(aEntityId: string, bEntityId: string, type: ActType): Promise<ToolResult<CompareData>> {
@@ -390,6 +394,12 @@ export class MockQlooClient implements QlooClient {
 }
 
 // ---------- helpers ----------
+
+/** A popularity inside the opener band, rounded down so it never reaches the ceiling. */
+function bandPopularity(band: { min: number; max: number }, u: number): number {
+  const lo = Math.min(band.min, band.max);
+  return Math.max(lo, Math.floor((lo + (band.max - lo) * u) * 100) / 100);
+}
 
 function uniqueNames(rand: () => number, n: number, gen: () => string): string[] {
   const out: string[] = [];

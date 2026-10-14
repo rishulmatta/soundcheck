@@ -7,7 +7,7 @@
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, isStepCount, Output, tool, type LanguageModelUsage, type ToolSet } from "ai";
 import { z } from "zod";
-import { BudgetTier, type ModelUsage } from "@/lib/types";
+import { BudgetTier, RoomTier, type ModelUsage } from "@/lib/types";
 import type { AgentToolSpec } from "./tools";
 import { COPY_INSTRUCTIONS, REVISE_INSTRUCTIONS, WITHOUT_QLOO_INSTRUCTIONS } from "./prompts";
 import { WithoutQloo } from "./comparison";
@@ -35,6 +35,7 @@ const RevisionDraftWire = z.object({
   stops: z.number().int().min(3).max(20).nullable(),
   window: z.string().max(60).nullable(),
   budgetTier: BudgetTier.nullable(),
+  roomTier: RoomTier.nullable(),
   /** One line restating the request as understood, or what could not be done with these controls. */
   note: z.string().max(300),
 });
@@ -46,6 +47,7 @@ export const RevisionDraft = z.object({
   stops: z.number().int().min(3).max(20).optional(),
   window: z.string().max(60).optional(),
   budgetTier: BudgetTier.optional(),
+  roomTier: RoomTier.optional(),
   note: z.string().max(300),
 });
 export type RevisionDraft = z.infer<typeof RevisionDraft>;
@@ -59,6 +61,7 @@ function fromWire(w: z.infer<typeof RevisionDraftWire>): RevisionDraft {
     stops: w.stops ?? undefined,
     window: w.window ?? undefined,
     budgetTier: w.budgetTier ?? undefined,
+    roomTier: w.roomTier ?? undefined,
     note: w.note,
   });
 }

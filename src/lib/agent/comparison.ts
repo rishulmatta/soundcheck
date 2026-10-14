@@ -66,6 +66,7 @@ export function sameComparisonBrief(a: PlanInput, b: PlanInput): boolean {
     stops: input.stops,
     window: input.window ?? null,
     budgetTier: input.budgetTier,
+    roomTier: input.roomTier ?? null,
     lockedCities: input.lockedCities,
     excludedCities: input.excludedCities,
     order: input.order ?? null,

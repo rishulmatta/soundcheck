@@ -1,6 +1,7 @@
 /** CSV export of a plan: one row per stop. Pure; RFC 4180 quoting, CRLF line endings. */
 import type { Plan, Stop } from "@/lib/types";
-import { ratesFor, routeEconomics, stopBreakEven, unitsFor, type Leg, type Rates } from "@/lib/economics";
+import { capacityBasis, ratesFor, routeEconomics, stopBreakEven, unitsFor, type Leg, type Rates } from "@/lib/economics";
+import { resolveRoomTier, type ResolvedRoomTier } from "@/lib/room";
 import { provenanceFor, safePlanForDisplay } from "@/lib/provenance";
 
 export const CSV_COLUMNS = [
@@ -56,14 +57,14 @@ interface Econ {
   unit: string;
   currency: string;
   rates: Rates;
-  actPopularity?: number;
+  room: ResolvedRoomTier;
   legs: Leg[];
 }
 
 function stopRow(stop: Stop, e: Econ): Cell[] {
   const c = stop.city;
   const leg = e.legs.find((l) => l.to === stop.order);
-  const b = stopBreakEven(stop, e.actPopularity, e.rates, leg);
+  const b = stopBreakEven(stop, e.room, e.rates, leg);
   return [
     stop.order,
     c.name,
@@ -99,10 +100,11 @@ export function planToCsv(plan: Plan): string {
   const provenance = provenanceFor(plan);
   const units = unitsFor(plan.input.region);
   const rates = ratesFor(plan.input.budgetTier, units);
-  const econ: Econ = { ...units, rates, actPopularity: plan.act.popularity, legs: routeEconomics(plan.stops, rates, units.unit).legs };
+  const room = resolveRoomTier(plan.input, plan.act.popularity);
+  const econ: Econ = { ...units, rates, room, legs: routeEconomics(plan.stops, rates, units.unit).legs };
   const notes: Cell[] = [
     provenance.dataMode, provenance.heatmapComparability, provenance.demographicsScope, provenance.scoringMethod,
-    "Unvalidated room-size planning assumption; not a demand forecast",
+    capacityBasis(room),
     "Tickets to cover modeled travel and crew costs only; not full show break-even",
   ];
   const lines = [CSV_COLUMNS.join(","), ...plan.stops.map((s) => [...stopRow(s, econ), ...notes].map(csvCell).join(","))];

@@ -99,6 +99,28 @@ describe("MockQlooClient", () => {
     expect(pod.data.length).toBeLessThan(artist.data.length);
   });
 
+  it("keeps related acts inside the opener popularity band, deterministically", async () => {
+    const band = { min: 0.62, max: 0.92 };
+    const opts = { locationQuery: "Boise", take: 8, explain: true, popularity: band };
+    const res = await mock.relatedActs(ACT, "artist", opts);
+    expect(res.status).toBe("ok");
+    expect(res.data).toHaveLength(8);
+    for (const e of res.data) {
+      expect(e.popularity).toBeGreaterThanOrEqual(band.min);
+      expect(e.popularity).toBeLessThan(band.max);
+    }
+    expect(res.meta.request).toContain("filter.popularity.min=0.62&filter.popularity.max=0.92");
+    expect(res.meta.note).toContain("opener band popularity 0.62..0.92");
+    expect(await new MockQlooClient().relatedActs(ACT, "artist", opts)).toEqual(res);
+    // Same names as the unbanded query; only the popularities move into the band.
+    const plain = await mock.relatedActs(ACT, "artist", { locationQuery: "Boise", take: 8, explain: true });
+    expect(res.data.map((e) => e.name)).toEqual(plain.data.map((e) => e.name));
+    expect(plain.meta.request).not.toContain("filter.popularity");
+    const thin = await mock.relatedActs("mock-artist-obscure-band", "artist", opts);
+    expect(thin.status).toBe("partial");
+    expect(thin.data[0].popularity).toBeLessThan(band.max);
+  });
+
   it("returns contract-shaped data for every method", async () => {
     const all = [
       await mock.findTags("afterparty"),

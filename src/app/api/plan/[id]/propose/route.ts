@@ -82,5 +82,6 @@ function proposalFromDraft(draft: RevisionDraft, plan: Pick<Plan, "input" | "sto
   const window = draft.window?.trim();
   if (window && window !== plan.input.window) changes.window = window;
   if (draft.budgetTier !== undefined && draft.budgetTier !== plan.input.budgetTier) changes.budgetTier = draft.budgetTier;
+  if (draft.roomTier !== undefined && draft.roomTier !== plan.input.roomTier) changes.roomTier = draft.roomTier;
   return { changes, note: draft.note, unmatched };
 }

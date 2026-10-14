@@ -1,8 +1,10 @@
 /** Pure source and legacy-copy helpers shared by server exports and browser views. */
-import type { Pick as PlanPick, Plan, PlanProvenance, Stop } from "./types";
-import { suggestCapacity } from "./economics";
+import type { Pick as PlanPick, Plan, PlanInput, PlanProvenance, Stop } from "./types";
+import { roomSuggestion, suggestCapacity } from "./economics";
+import { ROOM_TIERS, resolveRoomTier } from "./room";
 
-type SourcePlan = Pick<Plan, "act" | "stops" | "provenance">;
+/** `input` is optional so callers holding only the act and stops still work; without it the room tier is guessed. */
+type SourcePlan = Pick<Plan, "act" | "stops" | "provenance"> & { input?: Pick<PlanInput, "roomTier"> };
 
 /**
  * Live plans score cities from one region-wide heatmap query, so their values share a scale ("region-normalized").
@@ -36,13 +38,14 @@ export function provenanceFor(plan: SourcePlan): PlanProvenance {
 export function safeStopCopy(plan: SourcePlan, stop: Stop): Pick<Stop, "suggestion" | "whyHere"> {
   const source = provenanceFor(plan);
   if (source.proseVersion === 2) return { suggestion: stop.suggestion, whyHere: stop.whyHere };
-  const capacity = suggestCapacity(stop.city, plan.act.popularity ?? 0.5);
+  const room = resolveRoomTier(plan.input ?? {}, plan.act.popularity);
+  const capacity = suggestCapacity(stop.city, room);
   const prefix = source.dataMode === "mock" ? "Synthetic example" : "Provisional heuristic candidate";
   const scale = source.heatmapComparability === "region-normalized"
     ? "Values come from one region-wide Qloo heatmap"
     : "Cross-city comparability is unverified";
   return {
-    suggestion: `Room-size assumption: ${capacity.toLocaleString("en-US")} capacity; validate demand before booking.`,
+    suggestion: roomSuggestion(capacity, ROOM_TIERS[room.tier].label, room.guessed),
     whyHere: `${prefix}: recorded affinity ${stop.city.affinity.toFixed(2)}, popularity ${stop.city.popularity.toFixed(2)}. ${scale}; this does not establish ticket demand or booking history.`,
   };
 }

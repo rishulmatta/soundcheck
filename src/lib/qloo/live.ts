@@ -13,6 +13,7 @@
  */
 import type { ActType, CityPoolEntry, Region, ToolResult, ToolStatus } from "@/lib/types";
 import { CITY_CELL_RADIUS_KM, regionPolygonWkt } from "@/lib/geo";
+import type { PopularityBand } from "@/lib/room";
 import type {
   CompareData,
   DemographicsData,
@@ -87,6 +88,16 @@ export function locationQueryFor(city: CityPoolEntry): string {
 // ---------- request builders (also used by the mock so traces match) ----------
 
 export type Seed = { entityIds?: string[]; tagIds?: string[] };
+
+/** "0.65..0.95", used in trace notes by the live client, the mock and the agent. */
+export function formatPopularityBand(band: PopularityBand): string {
+  return `${band.min.toFixed(2)}..${band.max.toFixed(2)}`;
+}
+
+/** Note on a related-acts result that came from inside the opener band. Shared with the mock so traces match. */
+export function openerBandNote(band: PopularityBand): string {
+  return `opener band popularity ${formatPopularityBand(band)}`;
+}
 
 /** Monday on or before `now` (UTC), so trending URLs (and their cache keys) are stable for a week. */
 export function trendingWindow(weeks: number, now = new Date()): { start: string; end: string } {
@@ -166,11 +177,13 @@ export const qlooRequests = {
     };
   },
   /**
-   * GET /v2/insights same filter.type as the act, signal.location.query for the city, filter.exclude.entities for the act.
-   * signal.location.query and feature.explainability are listed as compatible with Artist/Person/Podcast in the
-   * parameter reference, though the per-type table omits them (unverified until key day).
+   * GET /v2/insights same filter.type as the act, signal.location.query for the city, filter.exclude.entities for the act,
+   * and filter.popularity.min/max for the opener band. signal.location.query and feature.explainability are listed as
+   * compatible with Artist/Person/Podcast in the parameter reference, though the per-type table omits them.
+   * Verified live 2026-10-14: without a popularity filter the top related acts for a 0.99 headliner were fellow
+   * headliners (1.00, 0.99); with filter.popularity.max=0.95 the same query returned support-sized acts (0.82..0.95).
    */
-  related(entityId: string, type: ActType, opts: { locationQuery?: string; take?: number; explain?: boolean }): QlooRequest {
+  related(entityId: string, type: ActType, opts: { locationQuery?: string; take?: number; explain?: boolean; popularity?: PopularityBand }): QlooRequest {
     return {
       path: "/v2/insights",
       params: {
@@ -178,6 +191,8 @@ export const qlooRequests = {
         "signal.interests.entities": [entityId],
         "signal.location.query": opts.locationQuery,
         "filter.exclude.entities": [entityId],
+        "filter.popularity.min": opts.popularity?.min,
+        "filter.popularity.max": opts.popularity?.max,
         take: clampTake(opts.take, 10),
         "feature.explainability": opts.explain ? true : undefined,
       },
@@ -280,9 +295,9 @@ export class LiveQlooClient implements QlooClient {
    * Runs steps in order until one returns data. The first step returning data is "ok" (or "partial"); a later one is
    * "degraded". A fatal HTTP failure stops the ladder with "error". All-empty ends as "empty".
    */
-  private async ladder<T>(
-    steps: Step[],
-    parse: (body: unknown) => Parsed<T> | undefined,
+  private async ladder<T, S extends Step = Step>(
+    steps: S[],
+    parse: (body: unknown, step: S) => Parsed<T> | undefined,
     emptyData: T,
     ctx: RedactContext,
   ): Promise<LadderOutcome<T>> {
@@ -304,7 +319,7 @@ export class LiveQlooClient implements QlooClient {
         notes.push(`${res.request} rejected: ${res.message}`);
         continue;
       }
-      const parsed = parse(res.body);
+      const parsed = parse(res.body, step);
       if (parsed === undefined) {
         notes.push(`${res.request}: unexpected response shape`);
         return { result: envelope("error", emptyData, res.request, started, allCached, notes) };
@@ -445,22 +460,50 @@ export class LiveQlooClient implements QlooClient {
     return result;
   }
 
+  /**
+   * Ladder, built from two flags (band given, city given): localized + band, localized without the band, unlocalized +
+   * band, unlocalized without the band. Each later step is "degraded" with a fallback note saying what was dropped.
+   * On a band step, results at or above the ceiling (+0.01 for rounding) are dropped as well, in case the filter is
+   * ever ignored; a step left with nothing moves on to the next one.
+   */
   async relatedActs(
     entityId: string,
     type: ActType,
-    opts: { locationQuery?: string; take?: number; explain?: boolean },
+    opts: { locationQuery?: string; take?: number; explain?: boolean; popularity?: PopularityBand },
   ): Promise<ToolResult<RelatedEntity[]>> {
     const take = clampTake(opts.take, 10);
-    const steps: Step[] = [{ req: qlooRequests.related(entityId, type, { ...opts, take }) }];
-    if (opts.locationQuery)
-      steps.push({ req: qlooRequests.related(entityId, type, { ...opts, take, locationQuery: undefined }), fallbackNote: "not localized to the city" });
-    const { result } = await this.ladder<RelatedEntity[]>(
+    const band = opts.popularity;
+    const locations = opts.locationQuery ? [opts.locationQuery, undefined] : [undefined];
+    const bands = band ? [band, undefined] : [undefined];
+    const steps: (Step & { band?: PopularityBand; place?: string })[] = [];
+    for (const locationQuery of locations) {
+      for (const popularity of bands) {
+        const dropped = [
+          opts.locationQuery && !locationQuery ? "not localized to the city" : undefined,
+          band && !popularity ? "no related acts inside the opener popularity band; ceiling dropped" : undefined,
+        ].filter(Boolean);
+        steps.push({
+          req: qlooRequests.related(entityId, type, { ...opts, take, locationQuery, popularity }),
+          fallbackNote: dropped.length ? dropped.join("; ") : undefined,
+          band: popularity,
+          place: locationQuery,
+        });
+      }
+    }
+    const { result } = await this.ladder<RelatedEntity[], (typeof steps)[number]>(
       steps,
-      (body) => {
-        const data = toEntityList(body)
-          .map((raw) => toRelatedEntity(raw, { actIds: [entityId], place: opts.locationQuery }))
+      (body, step) => {
+        const all = toEntityList(body)
+          .map((raw) => toRelatedEntity(raw, { actIds: [entityId], place: step.place }))
           .filter((e): e is RelatedEntity => !!e && e.id !== entityId);
-        return { data, count: data.length, requested: take };
+        if (!step.band) return { data: all, count: all.length, requested: take };
+        const ceiling = step.band.max + 0.01;
+        const data = all.filter((e) => e.popularity === undefined || e.popularity < ceiling);
+        const removed = all.length - data.length;
+        const note = [removed ? `${removed} above the band ceiling removed` : undefined, data.length ? openerBandNote(step.band) : undefined]
+          .filter(Boolean)
+          .join("; ");
+        return { data, count: data.length, requested: take, note: note || undefined };
       },
       [],
       { actIds: [entityId] },

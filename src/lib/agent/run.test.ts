@@ -8,6 +8,8 @@ import { MockQlooClient } from "@/lib/qloo/mock";
 import { cityPoolFor } from "./pool";
 import { applyChanges, describeChanges, revisionNote } from "@/lib/revision";
 import { legDaysAlong } from "@/lib/routing";
+import { openerPopularityBand, resolveRoomTier } from "@/lib/room";
+import { suggestCapacity } from "@/lib/economics";
 import type { ChangeSet } from "@/lib/types";
 
 /* ---------------------------------------------------------------- stubs */
@@ -25,8 +27,13 @@ interface StubOptions {
   trend?: { trend: "rising" | "flat" | "falling" | "unknown"; velocity?: number };
 }
 
-function stubQloo(opts: StubOptions = {}): QlooClient & { calls: Record<string, number>; heatmapRequests: { seed: "act" | "tags"; cities: string[] }[] } {
+function stubQloo(opts: StubOptions = {}): QlooClient & {
+  calls: Record<string, number>;
+  heatmapRequests: { seed: "act" | "tags"; cities: string[] }[];
+  relatedOpts: Parameters<QlooClient["relatedActs"]>[2][];
+} {
   const calls: Record<string, number> = {};
+  const relatedOpts: Parameters<QlooClient["relatedActs"]>[2][] = [];
   const heatmapRequests: { seed: "act" | "tags"; cities: string[] }[] = [];
   const hit = (k: string) => (calls[k] = (calls[k] ?? 0) + 1);
   const related = (prefix: string, n: number): RelatedEntity[] =>
@@ -42,6 +49,7 @@ function stubQloo(opts: StubOptions = {}): QlooClient & { calls: Record<string, 
     mode: opts.mode ?? "mock",
     calls,
     heatmapRequests,
+    relatedOpts,
     async searchEntity(query, type) {
       hit("searchEntity");
       if (opts.searchEmpty) return ok([], "GET /search?query=[act]", "empty");
@@ -94,6 +102,7 @@ function stubQloo(opts: StubOptions = {}): QlooClient & { calls: Record<string, 
     },
     async relatedActs(_id, _type, o) {
       hit("relatedActs");
+      relatedOpts.push(o);
       return ok(related(`op-${o.locationQuery}`, 5), "GET /v2/insights?filter.type=urn:entity:artist&signal.location.query=[city]");
     },
     async compareAudiences(_a, b) {
@@ -155,6 +164,31 @@ async function run(input: PlanInput, deps: Partial<RunDeps>) {
 }
 
 /* ---------------------------------------------------------------- tests */
+
+describe("opener popularity band", () => {
+  it("caps every opener query below the headliner and saves the opener's popularity on the pick", async () => {
+    const qloo = stubQloo();
+    const { plan, save } = await run(baseInput, { qloo, model: null });
+    // Stub act popularity 0.7, no stated room tier: guessed "under300", gap 0.08.
+    const band = openerPopularityBand(0.7, resolveRoomTier(baseInput, 0.7).tier);
+    expect(band).toEqual({ min: 0.32, max: 0.62 });
+    expect(qloo.relatedOpts.length).toBeGreaterThan(0);
+    expect(qloo.relatedOpts.every((o) => o.popularity?.min === band.min && o.popularity?.max === band.max)).toBe(true);
+    const openers = plan.stops.flatMap((s) => s.openers);
+    expect(openers.length).toBeGreaterThan(0);
+    expect(openers.every((o) => o.popularity === 0.6)).toBe(true);
+    const saved = (save.mock.calls as unknown as [Plan][]).at(-1)?.[0];
+    expect(saved?.stops[0].openers[0].popularity).toBe(0.6);
+    const step = plan.trace.find((t) => t.id === "openers");
+    expect(step?.summary).toContain("band 0.32..0.62");
+  });
+
+  it("uses the stated room tier for the band", async () => {
+    const qloo = stubQloo();
+    await run(PlanInput.parse({ ...baseInput, roomTier: "over5000" }), { qloo, model: null });
+    expect(qloo.relatedOpts[0].popularity).toEqual(openerPopularityBand(0.7, "over5000"));
+  });
+});
 
 describe("runPlan without a model (orchestrator only)", () => {
   it("covers every checklist item and produces a valid plan", async () => {
@@ -510,6 +544,52 @@ describe("number guard", () => {
     const facts = { qloo: { affinity: 0.91, multiple: 1.4 }, soundcheck: { suggestedCapacity: 1200 } } as unknown as Parameters<typeof copyUsesOnlyGivenNumbers>[1];
     expect(copyUsesOnlyGivenNumbers({ suggestion: "1,200-cap room", whyHere: "1.4x affinity, 91% match" }, facts)).toBe(true);
     expect(copyUsesOnlyGivenNumbers({ suggestion: "1,500-cap room", whyHere: "1.4x" }, facts)).toBe(false);
+  });
+});
+
+describe("room tier anchor", () => {
+  type RoomFacts = { city: string; qloo: { affinity: number; popularity: number }; soundcheck: { suggestedCapacity: number; capacityBasis: string; roomTier: string; roomTierGuessed: boolean } };
+  const capture = () => {
+    const seen: RoomFacts[] = [];
+    const model = stubModel({
+      writeStopCopy: async (facts) => {
+        seen.push(facts as RoomFacts);
+        throw new Error("use the template");
+      },
+    });
+    return { seen, model };
+  };
+
+  it("anchors every stop on the stated tier and says so in the facts and the template copy", async () => {
+    const { seen, model } = capture();
+    const { plan } = await run({ ...baseInput, roomTier: "800to2000" }, { qloo: stubQloo(), model });
+    const room = { tier: "800to2000" as const, guessed: false };
+    expect(seen).toHaveLength(plan.stops.length);
+    for (const f of seen) {
+      expect(f.soundcheck).toMatchObject({ roomTier: "800 to 2,000", roomTierGuessed: false });
+      expect(f.soundcheck.capacityBasis).toContain("800 to 2,000 (stated in the brief)");
+    }
+    for (const stop of plan.stops) {
+      const cap = suggestCapacity(stop.city, room);
+      expect(stop.suggestion).toBe(`Room-size assumption: ${cap.toLocaleString("en-US")} capacity, anchored on the stated 800 to 2,000 tier; validate demand before booking.`);
+    }
+  });
+
+  it("guesses the tier from act popularity when the brief states none, and labels it", async () => {
+    const { seen, model } = capture();
+    const { plan } = await run(baseInput, { qloo: stubQloo(), model });
+    const room = resolveRoomTier({}, plan.act.popularity);
+    expect(room.guessed).toBe(true);
+    expect(seen.every((f) => f.soundcheck.roomTierGuessed && f.soundcheck.capacityBasis.includes("guessed from Qloo popularity"))).toBe(true);
+    for (const stop of plan.stops) {
+      expect(stop.suggestion).toContain(`${suggestCapacity(stop.city, room).toLocaleString("en-US")} capacity, anchored on a tier guessed from Qloo popularity`);
+    }
+  });
+
+  it("lets model copy quote the tier bounds", () => {
+    const facts = { soundcheck: { suggestedCapacity: 1500, roomTier: "800 to 2,000", roomTierGuessed: false } } as unknown as Parameters<typeof copyUsesOnlyGivenNumbers>[1];
+    expect(copyUsesOnlyGivenNumbers({ suggestion: "Planning assumption: 1,500-cap room, anchored on the stated 800 to 2,000 tier.", whyHere: "" }, facts)).toBe(true);
+    expect(copyUsesOnlyGivenNumbers({ suggestion: "Planning assumption: 1,500-cap room in a 3,000 tier.", whyHere: "" }, facts)).toBe(false);
   });
 });
 

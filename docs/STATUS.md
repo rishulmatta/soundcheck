@@ -6,7 +6,16 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
 **Deadline:** Oct 30, 2026, 11:45 pm ET. Submit by Oct 29.
 
 ## Last updated
-2026-10-14 (session 6)
+2026-10-14 (session 7)
+
+## Session 7: openers below the headliner, rooms anchored on a stated tier
+
+- The user asked how openers avoid being as famous as the headliner (they did not: related acts carried no fame filter, and Khruangbin's Austin "openers" included Jungle at popularity 1.00 and Vulfpeck at 0.99) and how room size handles acts that command bigger or smaller venues (it could not: Qloo popularity is a percentile compressed near the top, so a 300-cap act and an arena act both sit at 0.99).
+- **Opener popularity band.** `/v2/insights` honours `filter.popularity.min` and `filter.popularity.max` (verified live: a 0.95 ceiling on Khruangbin returned Mildlife 0.90, Brainstory 0.82, Surprise Chef 0.93 instead of fellow headliners). `openerPopularityBand(actPopularity, tier)` in `src/lib/room.ts` sets max = act popularity minus a per-tier gap (0.02 for arenas up to 0.08 for rooms under 300), min = max − 0.3. `relatedActs` takes the band; the live ladder is city+band, city without band (degraded, "ceiling dropped"), no city with band, no city without band, with a hard filter above max + 0.01 on band steps. Default picks prefer in-band acts and an above-band pick's reason says it may be a peer. Cards and the tour show each opener's popularity with a tooltip that it is cultural presence, not draw. Opener queries now use `locationQueryFor(city)` like the other calls.
+- **Room tier anchor.** `PlanInput.roomTier` (under300 / 300to800 / 800to2000 / 2000to5000 / over5000, optional; absent means guessed from Qloo popularity and labeled as a guess everywhere). `suggestCapacity(city, room)` in `src/lib/economics.ts`: anchor × market multiplier (established 1.0 to 1.3 by affinity, untapped 0.7 to 0.9, reach 0.6), capped by a metro ceiling 400 + 1800·√metroM, clamped to half the tier floor and 1.5× its top, rounded. Facts, brief, copy instructions, template copy, the plan header line ("Rooms 800 to 2,000 (stated in the brief)"), the route economics "Room sizes." line, print cover, CSV basis column, the landing form ("Current room size", first row) and the revise bar / propose model all carry it. `ChangeSet.roomTier` revises it.
+- Live verification (local, Hermanos Gutiérrez, 6 stops, North America, room tier 800 to 2,000, plan `c7CShSLEOa`): 66.6 s, 37 Qloo calls, band 0.62..0.92, openers Brainstory 0.63 similarity, Los Bitchos, Aaron Frazer, Al Massrieen, Lukas Nelson; rooms 1,600 for San Francisco and Los Angeles, 1,500 Austin, 1,100 San Diego and Montreal, 1,000 Albuquerque, each sentence naming the stated tier. 7 model calls, 133,296 input tokens (92,024 cache reads).
+- Saved demos: inputs unchanged and untouched; their stored suggestion prose keeps the old capacity while break-even and the CSV capacity column recompute on a guessed tier, so the two can differ until the demos are regenerated (the user chose not to regenerate them).
+- Verification: typecheck, lint, 261 tests, production build.
 
 ## Session 6: live Qloo, region-normalized scoring
 
@@ -141,7 +150,7 @@ Every item below was settled with direct calls to https://hackathon.api.qloo.com
 - KV choice: Upstash Redis (Marketplace) vs Vercel KV. Pick whichever provisions fastest.
 
 ## Next session starts here
-1. Read the session 4, 5 and 6 entries and `docs/VALIDATION.md`. Do not rebuild already-implemented features from historical unchecked lists.
+1. Read the session 4 to 7 entries and `docs/VALIDATION.md`. Do not rebuild already-implemented features from historical unchecked lists.
 2. Live Qloo is on. Still open from key day: comedian and podcast live coverage, the `tagIds` filter for comedian openers, filtering taste tags to music/genre tags, and the per-city demographics calls in the guard.
 3. Ask the user to try the revision controls in a browser (drag a stop, Drop and Lock a card, type a request into the revise bar, Re-run) and fix whatever they report. Open questions: should Drop shrink the tour instead of replacing the city; should a city-set change keep the hand order as a backbone rather than discarding it.
 4. Week 1 list: act autocomplete, the small UI issues above. Copy quality: "1x the pool's median" reads oddly for reach cities; consider rounding language or a different lead for the reach quadrant.

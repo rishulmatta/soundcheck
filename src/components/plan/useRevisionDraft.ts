@@ -11,7 +11,7 @@ export interface DraftItem extends ChangeLine {
   id?: string;
 }
 
-type Field = "stops" | "window" | "budgetTier" | "order";
+type Field = "stops" | "window" | "budgetTier" | "roomTier" | "order";
 
 const same = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
 
@@ -39,9 +39,10 @@ export function useRevisionDraft(plan: Plan) {
       stops: c.stops === plan.input.stops ? undefined : c.stops,
       window: c.window === plan.input.window ? undefined : c.window,
       budgetTier: c.budgetTier === plan.input.budgetTier ? undefined : c.budgetTier,
+      roomTier: c.roomTier === plan.input.roomTier ? undefined : c.roomTier,
       order: c.order && !same(c.order, currentOrder) ? c.order : undefined,
     }),
-    [baseLocked, baseExcluded, plan.input.stops, plan.input.window, plan.input.budgetTier, currentOrder],
+    [baseLocked, baseExcluded, plan.input.stops, plan.input.window, plan.input.budgetTier, plan.input.roomTier, currentOrder],
   );
 
   const add = useCallback((partial: Partial<ChangeSet>) => {
@@ -69,7 +70,7 @@ export function useRevisionDraft(plan: Plan) {
         if (line) out.push({ ...line, key: `${kind}:${id}`, id });
       }
     }
-    for (const field of ["stops", "window", "budgetTier", "order"] as const) {
+    for (const field of ["stops", "window", "budgetTier", "roomTier", "order"] as const) {
       if (changes[field] === undefined) continue;
       const line = one({ [field]: changes[field] })[0];
       if (line) out.push({ ...line, key: field });
@@ -83,7 +84,7 @@ export function useRevisionDraft(plan: Plan) {
       if (item.id && (item.kind === "lock" || item.kind === "unlock" || item.kind === "drop" || item.kind === "restore")) {
         return { ...prev, [item.kind]: prev[item.kind].filter((x) => x !== item.id) };
       }
-      if (item.kind === "stops" || item.kind === "window" || item.kind === "budgetTier" || item.kind === "order") return { ...prev, [item.kind]: undefined };
+      if (item.kind === "stops" || item.kind === "window" || item.kind === "budgetTier" || item.kind === "roomTier" || item.kind === "order") return { ...prev, [item.kind]: undefined };
       return prev;
     });
   }, []);

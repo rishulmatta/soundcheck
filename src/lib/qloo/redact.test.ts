@@ -27,6 +27,10 @@ describe("redactRequest", () => {
     expect(redactParts(req.path, req.params, { actIds: [ACT] })).toBe(
       "GET /v2/insights?filter.type=urn:entity:artist&signal.interests.entities=[act]&signal.location.query=Salt%20Lake%20City&filter.exclude.entities=[act]&take=10&feature.explainability=true",
     );
+    const banded = qlooRequests.related(ACT, "artist", { locationQuery: "Austin", take: 8, popularity: { min: 0.65, max: 0.95 } });
+    expect(redactParts(banded.path, banded.params, { actIds: [ACT] })).toBe(
+      "GET /v2/insights?filter.type=urn:entity:artist&signal.interests.entities=[act]&signal.location.query=Austin&filter.exclude.entities=[act]&filter.popularity.min=0.65&filter.popularity.max=0.95&take=8",
+    );
     const trend = qlooRequests.trending(ACT, "artist", 8, new Date("2026-10-12T12:00:00Z"));
     expect(redactParts(trend.path, trend.params)).toBe(
       "GET /v2/trending?filter.type=urn:entity:artist&signal.interests.entities=[act]&filter.start_date=2026-08-17&filter.end_date=2026-10-12",

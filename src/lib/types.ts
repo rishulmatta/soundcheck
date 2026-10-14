@@ -33,6 +33,10 @@ export type Region = z.infer<typeof Region>;
 export const BudgetTier = z.enum(["van", "bus", "production"]);
 export type BudgetTier = z.infer<typeof BudgetTier>;
 
+/** The room size the act plays today, stated by the manager. Qloo popularity cannot tell room sizes apart; see src/lib/room.ts. */
+export const RoomTier = z.enum(["under300", "300to800", "800to2000", "2000to5000", "over5000"]);
+export type RoomTier = z.infer<typeof RoomTier>;
+
 export const PlanInput = z.object({
   actQuery: z.string().min(1),
   /** Qloo entity id once resolved; the agent resolves it when absent. */
@@ -45,6 +49,8 @@ export const PlanInput = z.object({
   lockedCities: z.array(z.string()).default([]),
   excludedCities: z.array(z.string()).default([]),
   budgetTier: BudgetTier.default("bus"),
+  /** Absent means "guess from Qloo popularity", and every room figure is labeled as a guess. */
+  roomTier: RoomTier.optional(),
   /**
    * Manual stop order as city ids, set when the user reorders the route by hand. Honoured by the router only when it
    * lists exactly the routed cities; otherwise the router orders the tour itself.
@@ -70,6 +76,7 @@ export const ChangeSet = z.object({
   stops: z.number().int().min(3).max(20).optional(),
   window: z.string().optional(),
   budgetTier: BudgetTier.optional(),
+  roomTier: RoomTier.optional(),
   /** Manual order of the routed city ids; see PlanInput.order. */
   order: z.array(z.string()).optional(),
 });
@@ -158,6 +165,8 @@ export const Pick = z.object({
   overlap: z.number().min(0).max(1).optional(),
   /** Soundcheck's derived similarity of shared taste scores, not a percentage of shared fans. */
   tasteSimilarity: z.number().min(0).max(1).optional(),
+  /** Qloo popularity percentile of the pick (0..1). For openers, shown against the headliner's. */
+  popularity: z.number().min(0).max(1).optional(),
   /** One line from Qloo explainability, or our summary of it. */
   reason: z.string(),
   tags: z.array(z.string()).default([]),

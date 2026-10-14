@@ -91,8 +91,16 @@ export interface QlooClient {
   demographics(seed: { entityIds?: string[]; tagIds?: string[] }, opts?: { locationQuery?: string }): Promise<ToolResult<DemographicsData>>;
   /** GET /v2/trending */
   trending(entityId: string, type: ActType, opts?: { weeks?: number }): Promise<ToolResult<TrendingData>>;
-  /** GET /v2/insights?filter.type=<same type> localized to a city, excluding the act. Openers / support acts. */
-  relatedActs(entityId: string, type: ActType, opts: { locationQuery?: string; take?: number; explain?: boolean }): Promise<ToolResult<RelatedEntity[]>>;
+  /**
+   * GET /v2/insights?filter.type=<same type> localized to a city, excluding the act. Openers / support acts.
+   * `popularity` is a Qloo popularity band (filter.popularity.min/max, verified live 2026-10-14) so openers sit below
+   * the headliner; when nothing matches inside the band the client retries without it and reports "degraded".
+   */
+  relatedActs(
+    entityId: string,
+    type: ActType,
+    opts: { locationQuery?: string; take?: number; explain?: boolean; popularity?: { min: number; max: number } },
+  ): Promise<ToolResult<RelatedEntity[]>>;
   /** GET /v2/analysis/compare between the act and a candidate opener. */
   compareAudiences(aEntityId: string, bEntityId: string, type: ActType): Promise<ToolResult<CompareData>>;
   /** GET /v2/insights?filter.type=urn:entity:brand seeded by the act, optionally biased by demographics. */

@@ -108,7 +108,7 @@ export function PrintView({ plan }: { plan: Plan }) {
           <h2 className="font-display text-[26px] font-semibold leading-7">Route and cost assumptions</h2>
           <p className="mt-2 text-[13px] leading-[18px] text-ink-muted">{act.name} · {plan.stops.length} proposed stops. Confirm demand, availability and a complete show budget before booking.</p>
           <RouteStrip stops={plan.stops} animate={false} interactive={false} className="mt-6" />
-          <RouteEconomicsStrip stops={plan.stops} region={plan.input.region} state={{ tier: econ.tier, rates: econ.rates, units: econ.units, economics: econ.economics }} editable={false} className="mt-4" />
+          <RouteEconomicsStrip stops={plan.stops} region={plan.input.region} state={{ tier: econ.tier, rates: econ.rates, units: econ.units, economics: econ.economics, room: econ.room }} editable={false} className="mt-4" />
           <ProvenanceFooter plan={plan} className="mt-6" />
         </section>
 

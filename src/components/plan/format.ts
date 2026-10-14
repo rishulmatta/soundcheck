@@ -1,4 +1,6 @@
 import type { ActType, Plan, Region, Stop } from "@/lib/types";
+import { roomTierLine } from "@/lib/economics";
+import { resolveRoomTier } from "@/lib/room";
 
 export const REGION_LABEL: Record<Region, string> = {
   "north-america": "North America",
@@ -35,9 +37,11 @@ export function formatDate(iso: string): string {
   return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
 }
 
-export function planParams(plan: Pick<Plan, "input" | "stops">): string[] {
+/** The brief in one line, including the room tier every suggested capacity is anchored on (stated or guessed). */
+export function planParams(plan: Pick<Plan, "input" | "stops"> & { act?: { popularity?: number } }): string[] {
   const out: string[] = [REGION_LABEL[plan.input.region], `${plan.stops.length || plan.input.stops} stops`];
   if (plan.input.window) out.push(plan.input.window);
+  out.push(roomTierLine(resolveRoomTier(plan.input, plan.act?.popularity)));
   return out;
 }
 

@@ -72,6 +72,8 @@ describe("planToCsv", () => {
     expect(first.suggestion).toMatch(/Room-size assumption/);
     expect(first.whyHere).toContain("Cross-city comparability is unverified");
     expect(first.ticketsBasis).toContain("not full show break-even");
+    expect(first.capacityBasis).toContain("guessed from Qloo popularity");
+    expect(first.capacityBasis).toContain("not a demand forecast");
   });
 
   it("round-trips awkward text", () => {

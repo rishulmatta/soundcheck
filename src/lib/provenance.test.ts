@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import sample from "@/fixtures/plan.sample.json";
 import { Plan } from "./types";
 import { createProvenance, provenanceFor, safePickReason, safePlanForDisplay, safeStopCopy } from "./provenance";
+import { suggestCapacity } from "./economics";
+import { resolveRoomTier } from "./room";
 
 const legacy = () => Plan.parse(structuredClone(sample));
 
@@ -34,6 +36,24 @@ describe("saved plan provenance", () => {
     expect(copy).toContain("one region-wide Qloo heatmap");
     expect(copy).not.toContain("unverified");
     expect(copy).toContain("does not establish ticket demand");
+  });
+
+  it("anchors legacy fallback room sizes on the brief's room tier, or labels the tier as guessed", () => {
+    const plan = legacy();
+    plan.input.roomTier = "800to2000";
+    const stated = safeStopCopy(plan, plan.stops[0]).suggestion;
+    const cap = suggestCapacity(plan.stops[0].city, { tier: "800to2000", guessed: false });
+    expect(stated).toBe(`Room-size assumption: ${cap.toLocaleString("en-US")} capacity, anchored on the stated 800 to 2,000 tier; validate demand before booking.`);
+
+    plan.input.roomTier = undefined;
+    const room = resolveRoomTier({}, plan.act.popularity);
+    const guessed = safeStopCopy(plan, plan.stops[0]).suggestion;
+    expect(guessed).toContain(`${suggestCapacity(plan.stops[0].city, room).toLocaleString("en-US")} capacity`);
+    expect(guessed).toContain("guessed from Qloo popularity");
+    // Callers without the input (act and stops only) get the same guess.
+    const { input: _input, ...noInput } = plan;
+    void _input;
+    expect(safeStopCopy(noInput, plan.stops[0]).suggestion).toBe(guessed);
   });
 
   it("recognizes synthetic act and recommendation ids, even if contradictory metadata claims live", () => {

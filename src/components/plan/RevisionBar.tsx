@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
-import { BudgetTier, RevisionProposal, type Plan } from "@/lib/types";
+import { BudgetTier, RevisionProposal, RoomTier, type Plan } from "@/lib/types";
 import { BUDGET_TIER_LABEL } from "@/lib/economics";
+import { ROOM_TIERS, ROOM_TIER_ORDER, guessRoomTier } from "@/lib/room";
 import { isReorderOnly } from "@/lib/revision";
 import { Button } from "@/components/ui/Button";
 import { ChevronDown, X } from "@/components/ui/icons";
@@ -24,6 +25,7 @@ const KIND_TONE: Record<DraftItem["kind"], string> = {
   stops: "border-line-strong text-ink",
   window: "border-line-strong text-ink",
   budgetTier: "border-line-strong text-ink",
+  roomTier: "border-line-strong text-ink",
   order: "border-signal text-signal",
 };
 
@@ -201,7 +203,7 @@ export function RevisionBar({ plan, draft }: { plan: Plan; draft: RevisionDraft 
         )}
 
         {more && (
-          <div id={id("more")} className="sc-fade grid grid-cols-2 gap-3 sm:grid-cols-[96px_200px_minmax(0,260px)]">
+          <div id={id("more")} className="sc-fade grid grid-cols-2 gap-3 sm:grid-cols-[96px_200px_200px] md:grid-cols-[96px_200px_200px_minmax(0,260px)]">
             <Field label="Stops" htmlFor={id("stops")}>
               <input
                 id={id("stops")}
@@ -237,7 +239,25 @@ export function RevisionBar({ plan, draft }: { plan: Plan; draft: RevisionDraft 
                 <span className="pointer-events-none absolute right-3 top-2.5 text-ink-muted"><ChevronDown /></span>
               </div>
             </Field>
-            <Field label="Window" htmlFor={id("window")} className="col-span-2 sm:col-span-1">
+            <Field label="Room size" htmlFor={id("room")} className="col-span-2 sm:col-span-1">
+              <div className="relative">
+                {/* ChangeSet.roomTier cannot say "back to guessing", so a plan with a stated tier offers tiers only; a
+                    guessed plan keeps its guess as the first option, which clears a pending tier change. */}
+                <select
+                  id={id("room")}
+                  className={cn(fieldCls, "appearance-none pr-9")}
+                  value={changes.roomTier ?? plan.input.roomTier ?? ""}
+                  onChange={(e) => draft.setField("roomTier", RoomTier.safeParse(e.target.value).data)}
+                >
+                  {!plan.input.roomTier && <option value="">Guessed: {ROOM_TIERS[guessRoomTier(plan.act.popularity)].label}</option>}
+                  {ROOM_TIER_ORDER.map((t) => (
+                    <option key={t} value={t}>{ROOM_TIERS[t].label}</option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-3 top-2.5 text-ink-muted"><ChevronDown /></span>
+              </div>
+            </Field>
+            <Field label="Window" htmlFor={id("window")} className="col-span-2 sm:col-span-3 sm:max-w-[260px] md:col-span-1">
               <MonthRangePicker
                 id={id("window")}
                 value={parseWindow(windowText)}

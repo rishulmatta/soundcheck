@@ -34,6 +34,8 @@ import {
 import { scoreCities, type ScorableHeatmap } from "@/lib/score";
 import { mergeProfile, type ActProfile } from "@/lib/actProfile";
 import { matchesCity, routeTour } from "@/lib/routing";
+import { openerPopularityBand, resolveRoomTier, type PopularityBand } from "@/lib/room";
+import { formatPopularityBand, locationQueryFor } from "@/lib/qloo/live";
 
 /* ------------------------------------------------------------------ tracer */
 
@@ -203,6 +205,8 @@ export interface RunState {
   route?: { order: CityScore[]; legDays: number[] };
   routeNotes: string[];
   openers: Map<string, { items: RelatedEntity[]; status: ToolStatus }>;
+  /** Qloo popularity band every opener query was capped to; set once per run by fetchOpeners. */
+  openerBand?: PopularityBand;
   overlaps: Map<string, { overlap: number; sharedTags: string[]; status: ToolStatus }>;
   brandSets: BrandSet[];
   places: Map<string, { items: RelatedEntity[]; status: ToolStatus }>;
@@ -623,9 +627,21 @@ export function route(ctx: RunContext, stops?: number, alsoLock: string[] = []) 
   return r;
 }
 
+/** Openers sit below the headliner: the band comes from the act's Qloo popularity and the stated (or guessed) room tier. */
+function openerBand(ctx: RunContext, act: Act): PopularityBand {
+  ctx.state.openerBand ??= openerPopularityBand(act.popularity, resolveRoomTier(ctx.input, act.popularity).tier);
+  return ctx.state.openerBand;
+}
+
+function openersSummary(ctx: RunContext): string {
+  const band = ctx.state.openerBand;
+  return `openers ×${ctx.state.openers.size}, compare ×${ctx.state.overlaps.size}${band ? `, band ${formatPopularityBand(band)}` : ""}`;
+}
+
 export async function fetchOpeners(ctx: RunContext, cityIds: string[], take = 8) {
   const act = await ensureAct(ctx);
   ctx.tracer.begin("openers", "Openers");
+  const band = hasEntity(ctx) ? openerBand(ctx, act) : undefined;
   const cities = cityIds.map((id) => findCity(ctx, id)).filter((c): c is CityPoolEntry => !!c && !ctx.state.openers.has(c.id));
   await mapLimit(cities, 4, async (city) => {
     if (!hasEntity(ctx)) {
@@ -633,11 +649,11 @@ export async function fetchOpeners(ctx: RunContext, cityIds: string[], take = 8)
       return;
     }
     const res = await q(ctx, "openers", "relatedActs", [] as RelatedEntity[], () =>
-      ctx.qloo.relatedActs(act.id, act.type, { locationQuery: city.name, take, explain: true }),
+      ctx.qloo.relatedActs(act.id, act.type, { locationQuery: locationQueryFor(city), take, explain: true, popularity: band }),
     );
     ctx.state.openers.set(city.id, { items: res.data.filter((e) => e.id !== act.id), status: res.status });
   });
-  ctx.tracer.end("openers", `${act.type} ×${ctx.state.openers.size}, compare ×${ctx.state.overlaps.size}`);
+  ctx.tracer.end("openers", openersSummary(ctx));
   return Object.fromEntries(cityIds.map((id) => [id, ctx.state.openers.get(findCity(ctx, id)?.id ?? id)]));
 }
 
@@ -652,7 +668,7 @@ export async function compareOpeners(ctx: RunContext, candidateIds: string[]) {
     );
     ctx.state.overlaps.set(id, { overlap: clamp01(res.data.overlap), sharedTags: res.data.sharedTags ?? [], status: res.status });
   });
-  ctx.tracer.end("openers", `${act.type} ×${ctx.state.openers.size}, compare ×${ctx.state.overlaps.size}`);
+  ctx.tracer.end("openers", openersSummary(ctx));
   return Object.fromEntries(candidateIds.map((id) => [id, ctx.state.overlaps.get(id)]));
 }
 
@@ -837,7 +853,7 @@ export function createAgentTools(ctx: RunContext, track: <T>(p: Promise<T>) => P
     ),
     spec(
       "findOpeners",
-      "Qloo insights of the act's own type localized to each city, excluding the act: candidate openers / support acts.",
+      "Qloo insights of the act's own type localized to each city, excluding the act: candidate openers / support acts. Candidates are already capped below the headliner's Qloo popularity (a band set from the act's popularity and room tier), so they are support-sized rather than fellow headliners; a degraded status means nothing matched inside the band and the ceiling was dropped. Popularity is a percentile of cultural presence, not ticket draw.",
       z.object({ cityIds, take: z.number().int().min(3).max(15).optional() }),
       async ({ cityIds: ids, take }) => {
         const r = await fetchOpeners(ctx, ids, take);

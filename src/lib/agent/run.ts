@@ -17,7 +17,8 @@ import { fetchActProfile, type ActProfile } from "@/lib/actProfile";
 import { Plan, PlanInput, type ActType, type PlanProvenance, type ChangeSet, type CityPoolEntry, type CityScore, type Demographics, type Momentum, type Pick as PickT, type PlanEvent, type Stop, type ToolStatus, type TraceStep } from "@/lib/types";
 import { matchesCity } from "@/lib/routing";
 import { isReorderOnly, reorderStops } from "@/lib/revision";
-import { suggestCapacity } from "@/lib/economics";
+import { capacityBasis, roomSuggestion, suggestCapacity } from "@/lib/economics";
+import { ROOM_TIERS, resolveRoomTier, type ResolvedRoomTier } from "@/lib/room";
 import { createProvenance, provenanceFor, safePlanForDisplay } from "@/lib/provenance";
 import { sameComparisonBrief, validateWithoutQloo } from "./comparison";
 import { cityPoolFor, spreadPick } from "./pool";
@@ -230,8 +231,14 @@ function bestBrandSet(sets: BrandSet[], buckets: string[]): BrandSet | undefined
 
 function defaultPicks(ctx: RunContext, cityId: string) {
   const { state } = ctx;
+  // A degraded opener list may carry acts above the band (the ceiling was dropped); prefer anything inside it.
+  const ceiling = state.openerBand ? state.openerBand.max + 0.01 : Infinity;
+  const inBand = (e: RelatedEntity) => (e.popularity ?? 0) <= ceiling;
   const openers = [...(state.openers.get(cityId)?.items ?? [])].sort(
-    (a, b) => (state.overlaps.get(b.id)?.overlap ?? -1) - (state.overlaps.get(a.id)?.overlap ?? -1) || (b.affinity ?? 0) - (a.affinity ?? 0),
+    (a, b) =>
+      Number(inBand(b)) - Number(inBand(a)) ||
+      (state.overlaps.get(b.id)?.overlap ?? -1) - (state.overlaps.get(a.id)?.overlap ?? -1) ||
+      (b.affinity ?? 0) - (a.affinity ?? 0),
   );
   const demo = state.cityDemographics.get(cityId);
   const brands = bestBrandSet(state.brandSets, topAgeBuckets(demo))?.items ?? [];
@@ -262,7 +269,7 @@ export function announceWeeks(quadrant: CityScore["quadrant"], trend: Momentum["
 }
 
 function toPick(e: RelatedEntity, reason: string, overlap?: number): PickT {
-  return { id: e.id, name: e.name, tasteSimilarity: overlap, reason, tags: e.tags.slice(0, 4) };
+  return { id: e.id, name: e.name, tasteSimilarity: overlap, popularity: e.popularity, reason, tags: e.tags.slice(0, 4) };
 }
 
 function buildPicks(ctx: RunContext, city: CityScore): Pick<Stop, "openers" | "sponsors" | "places"> {
@@ -279,7 +286,11 @@ function buildPicks(ctx: RunContext, city: CityScore): Pick<Stop, "openers" | "s
       const base = has
         ? `Derived taste similarity ${ov.overlap.toFixed(2)} from compare results for ${act.name}; not a percentage of shared fans.`
         : `Related-act candidate from taste-affinity results for ${act.name}; local connection and availability need verification.`;
-      return toPick(e, e.explanation ? `${base} ${e.explanation}` : base, has ? ov.overlap : undefined);
+      const band = state.openerBand;
+      const above = band && e.popularity !== undefined && e.popularity > band.max + 0.01
+        ? ` Qloo popularity ${e.popularity.toFixed(2)} is above the opener band (up to ${band.max.toFixed(2)}); nothing matched inside it, so this may be a peer rather than a support act.`
+        : "";
+      return toPick(e, `${e.explanation ? `${base} ${e.explanation}` : base}${above}`, has ? ov.overlap : undefined);
     });
   const demo = state.cityDemographics.get(city.id);
   const ages = topAgeBuckets(demo).map((b) => b.replace(/_/g, " "));
@@ -309,9 +320,11 @@ function stopDemographics(ctx: RunContext, cityId: string): Demographics {
   return ctx.state.cityDemographics.get(cityId) ?? { age: [], gender: { female: 0, male: 0 }, status: "empty" };
 }
 
-export function copyFacts(ctx: RunContext, city: CityScore, legDays: number, demo: Demographics, order = 1) {
+/** `room` is resolved once per run by runPlan; the default resolves it the same way for single calls (tests). */
+export function copyFacts(ctx: RunContext, city: CityScore, legDays: number, demo: Demographics, order = 1, room?: ResolvedRoomTier) {
   const { state, input } = ctx;
   const act = state.act!;
+  const r = room ?? resolveRoomTier(input, act.popularity);
   const cands = state.candidates ?? [];
   const trend = state.momentum?.trend ?? "unknown";
   const [w1, w2] = announceWeeks(city.quadrant, trend);
@@ -338,8 +351,10 @@ export function copyFacts(ctx: RunContext, city: CityScore, legDays: number, dem
       quadrant: city.quadrant,
       quadrantLabel: QUADRANT_LABEL[city.quadrant],
       underserved: city.underserved,
-      suggestedCapacity: suggestCapacity(city, act.popularity ?? 0.5),
-      capacityBasis: "Unvalidated room-size planning assumption; not a forecast of ticket demand",
+      suggestedCapacity: suggestCapacity(city, r),
+      capacityBasis: capacityBasis(r),
+      roomTier: ROOM_TIERS[r.tier].label,
+      roomTierGuessed: r.guessed,
       timingBasis: "Heuristic announcement window; no booking or availability data",
       announceWeeksMin: w1,
       announceWeeksMax: w2,
@@ -371,11 +386,10 @@ export function leadAngle(order: number, demo: Demographics, trend: string, legD
 type Facts = ReturnType<typeof copyFacts>;
 
 export function templateCopy(f: Facts): StopCopy {
-  const cap = f.soundcheck.suggestedCapacity.toLocaleString("en-US");
   const whyHere = f.qloo.heatmapComparability === "region-normalized"
     ? `Research lead: ${f.city} has affinity ${f.qloo.affinity} and popularity ${f.qloo.popularity} in one region-wide Qloo heatmap; not evidence of ticket demand or booking history.`
     : `${f.qloo.dataMode === "mock" ? "Synthetic example" : "Provisional heuristic candidate"}: ${f.city} has recorded affinity ${f.qloo.affinity} and popularity ${f.qloo.popularity}; cross-city comparability is unverified.`;
-  return { suggestion: `Room-size assumption: ${cap} capacity; validate demand before booking.`, whyHere };
+  return { suggestion: roomSuggestion(f.soundcheck.suggestedCapacity, f.soundcheck.roomTier, f.soundcheck.roomTierGuessed), whyHere };
 }
 
 /** Every number in the text, thousands separators removed. */
@@ -614,6 +628,8 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
   const legDays = state.route?.legDays ?? [];
   const parentStops = [...(reusableBaseline?.stops ?? [])].sort((a, b) => a.order - b.order);
   const parentBy = new Map(parentStops.map((s, i) => [s.city.id, { stop: s, prev: i ? parentStops[i - 1].city.id : null }]));
+  // Every stop's room is anchored on the same tier: stated in the brief, or guessed once from the act's popularity.
+  const room = resolveRoomTier(input, state.act?.popularity);
   tracer.begin("explain", "Explain picks");
   let modelCopies = 0;
   let reusedCopies = 0;
@@ -629,13 +645,14 @@ export async function runPlan(rawInput: PlanInput, emit: (e: PlanEvent) => void,
     const parent = parentBy.get(city.id);
     const sameLeg = parent && reusableBaseline?.provenance?.proseVersion === 2 &&
       reusableBaseline.input.window === input.window && reusableBaseline.input.budgetTier === input.budgetTier &&
+      reusableBaseline.input.roomTier === input.roomTier &&
       parent.prev === (i ? order[i - 1].id : null) && parent.stop.legDays === days;
     let copy: StopCopy;
     if (sameLeg) {
       copy = { suggestion: parent.stop.suggestion, whyHere: parent.stop.whyHere };
       reusedCopies++;
     } else {
-      const facts = copyFacts(ctx, city, days, demo, i + 1);
+      const facts = copyFacts(ctx, city, days, demo, i + 1, room);
       copy = templateCopy(facts);
       if (deps.model) {
         try {

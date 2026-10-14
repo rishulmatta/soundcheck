@@ -5,12 +5,15 @@
  * This module models exactly that and nothing more:
  * - leg distance from the routed stops (great-circle × a road factor), travel days from the route, crew days from both;
  * - a travel-and-crew estimate from a per-distance and a per-day rate that depend on the budget tier and stay editable;
- * - a break-even per stop from the suggested capacity and an assumed average ticket.
+ * - a break-even per stop from the suggested capacity (anchored on the brief's room tier; see suggestCapacity) and an
+ *   assumed average ticket.
  * Legs longer than the tier's flight threshold are flagged as flight legs and left unpriced: there is no reliable free
  * source for flight or hotel prices and a made-up figure would be worse than none. Venue fees, production and the
  * act's guarantee are out of scope and the UI says so.
  */
 import { haversineKm } from "@/lib/routing";
+import { ROOM_TIERS, describeRoomTier, resolveRoomTier, type ResolvedRoomTier } from "@/lib/room";
+import { quadrantOf } from "@/lib/score";
 import type { BudgetTier, CityScore, PlanInput, Region, Stop } from "@/lib/types";
 
 export interface Rates {
@@ -71,13 +74,65 @@ export function ratesFor(tier: BudgetTier, units: Units): Rates {
   return { ...r, perUnit: Math.round((r.perUnit * MI_PER_KM) * 10) / 10, flightLeg: Math.round(r.flightLeg / MI_PER_KM / 50) * 50 };
 }
 
-/** Soundcheck's own venue-size heuristic (not a Qloo output): metro size scaled by affinity, local popularity and act popularity. */
-export function suggestCapacity(city: Pick<CityScore, "metroM" | "affinity" | "popularity">, actPopularity = 0.5): number {
-  const metro = city.metroM ?? 1;
-  const base = 250 + 540 * Math.sqrt(metro);
-  const raw = base * (0.4 + 0.6 * city.affinity) * (0.5 + 0.5 * city.popularity) * (0.5 + actPopularity);
-  const clamped = Math.min(6000, Math.max(150, raw));
+const clamp01 = (n: number) => (Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0);
+
+/** How far a city moves the room from the tier's anchor, by the quadrant it sits in on the chart. */
+export function marketMultiplier(city: Pick<CityScore, "affinity" | "popularity"> & { quadrant?: CityScore["quadrant"] }): number {
+  const quadrant = city.quadrant ?? quadrantOf(city.affinity, city.popularity);
+  const fit = clamp01((city.affinity - 0.5) / 0.5);
+  if (quadrant === "established") return 1 + 0.3 * fit;
+  if (quadrant === "untapped") return 0.7 + 0.2 * fit;
+  return 0.6;
+}
+
+/** A small metro caps the room whatever the act plays elsewhere. metroM in millions, default 1. */
+export function metroCeiling(metroM: number | undefined): number {
+  return 400 + 1800 * Math.sqrt(metroM ?? 1);
+}
+
+/**
+ * Soundcheck's room-size planning assumption for one stop (not a Qloo output, not a demand forecast).
+ *
+ * Qloo popularity is a percentile compressed near the top, so it cannot tell a 300-cap act from an arena act. The
+ * room is anchored on the tier the manager states in the brief (or the tier guessed from popularity, labeled as a
+ * guess), and the city's Qloo signals only move it up or down:
+ *
+ *   fit        = clamp((affinity − 0.5) / 0.5, 0, 1)
+ *   multiplier = established: 1.0 + 0.3 · fit   (1.0 to 1.3)
+ *                untapped:    0.7 + 0.2 · fit   (0.7 to 0.9; less known, so a smaller room and a longer announce)
+ *                reach:       0.6
+ *   ceiling    = 400 + 1800 · √metroM            (metroM in millions, default 1)
+ *   capacity   = clamp(min(anchor × multiplier, ceiling), tier.min × 0.5, tier.max × 1.5)
+ *
+ * rounded to 50 below 1,000 and to 100 above. The quadrant is the city's own (the chart's) when present.
+ */
+export function suggestCapacity(
+  city: Pick<CityScore, "metroM" | "affinity" | "popularity"> & { quadrant?: CityScore["quadrant"] },
+  room: ResolvedRoomTier,
+): number {
+  const tier = ROOM_TIERS[room.tier];
+  const raw = Math.min(tier.anchor * marketMultiplier(city), metroCeiling(city.metroM));
+  const clamped = Math.min(tier.max * 1.5, Math.max(tier.min * 0.5, raw));
   return clamped < 1000 ? Math.round(clamped / 50) * 50 : Math.round(clamped / 100) * 100;
+}
+
+/** One line on what every suggested capacity in a plan rests on. Shown once per plan, and in the copy facts. */
+export function capacityBasis(room: ResolvedRoomTier): string {
+  return `Anchored on the room tier ${describeRoomTier(room)} and moved by the city's affinity and popularity; a planning assumption, not a demand forecast`;
+}
+
+/**
+ * The suggestion sentence for a stop: "Room-size assumption: 1,300 capacity, anchored on the stated 800 to 2,000 tier;
+ * validate demand before booking." (or "on a tier guessed from Qloo popularity (300 to 800)"). Takes the tier label so the copy facts (which carry the label) can build it too.
+ */
+export function roomSuggestion(capacity: number, tierLabel: string, guessed: boolean): string {
+  const tier = guessed ? `a tier guessed from Qloo popularity (${tierLabel})` : `the stated ${tierLabel} tier`;
+  return `Room-size assumption: ${capacity.toLocaleString("en-US")} capacity, anchored on ${tier}; validate demand before booking.`;
+}
+
+/** Short form for plan headers: "Rooms 800 to 2,000 (stated in the brief)". */
+export function roomTierLine(room: ResolvedRoomTier): string {
+  return `Rooms ${describeRoomTier(room)}`;
 }
 
 export interface Leg {
@@ -155,8 +210,8 @@ export interface BreakEven {
 }
 
 /** Travel-and-crew break-even for one stop: the leg that brings the tour in plus one show day, against the suggested room. */
-export function stopBreakEven(stop: Stop, actPopularity: number | undefined, rates: Rates, leg: Leg | undefined): BreakEven {
-  const capacity = suggestCapacity(stop.city, actPopularity ?? 0.5);
+export function stopBreakEven(stop: Stop, room: ResolvedRoomTier, rates: Rates, leg: Leg | undefined): BreakEven {
+  const capacity = suggestCapacity(stop.city, room);
   const gross = capacity * rates.avgTicket;
   if (leg?.flight) return { capacity, gross };
   const cost = (leg?.cost ?? 0) + rates.perDay;
@@ -173,19 +228,22 @@ export interface StaticEconomics {
   rates: Rates;
   units: Units;
   economics: RouteEconomics;
+  /** The room tier every suggested capacity is anchored on. */
+  room: ResolvedRoomTier;
   /** Break-even per stop order. */
   breakEven: Map<number, BreakEven>;
 }
 
 /** The plan's tier at default rates, for server-rendered views (print) and anything else without editable state. */
-export function staticEconomics(plan: { input: Pick<PlanInput, "budgetTier" | "region">; stops: Stop[]; act?: { popularity?: number } }): StaticEconomics {
+export function staticEconomics(plan: { input: Pick<PlanInput, "budgetTier" | "region" | "roomTier">; stops: Stop[]; act?: { popularity?: number } }): StaticEconomics {
   const tier = plan.input.budgetTier;
   const units = unitsFor(plan.input.region);
   const rates = ratesFor(tier, units);
+  const room = resolveRoomTier(plan.input, plan.act?.popularity);
   const economics = routeEconomics(plan.stops, rates, units.unit);
   const breakEven = new Map<number, BreakEven>();
-  for (const s of plan.stops) breakEven.set(s.order, stopBreakEven(s, plan.act?.popularity, rates, economics.legs.find((l) => l.to === s.order)));
-  return { tier, rates, units, economics, breakEven };
+  for (const s of plan.stops) breakEven.set(s.order, stopBreakEven(s, room, rates, economics.legs.find((l) => l.to === s.order)));
+  return { tier, rates, units, economics, room, breakEven };
 }
 
 export function formatInt(n: number): string {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PlanInput, type CityPoolEntry } from "@/lib/types";
-import { agentPrompt, AGENT_INSTRUCTIONS, COPY_INSTRUCTIONS, SAFE_USE_RULES, withoutQlooPrompt, PLANNING_OBJECTIVE } from "./prompts";
+import { agentPrompt, AGENT_INSTRUCTIONS, COPY_INSTRUCTIONS, REVISE_INSTRUCTIONS, SAFE_USE_RULES, revisePrompt, withoutQlooPrompt, PLANNING_OBJECTIVE } from "./prompts";
 
 describe("comparison prompt constraints", () => {
   it("gives both arms the same objective, candidate pool, and all planning constraints", () => {
@@ -22,6 +22,7 @@ describe("comparison prompt constraints", () => {
       expect(prompt).toContain("Region: uk-ireland.");
       expect(prompt).toContain("Touring window: June 2027.");
       expect(prompt).toContain("Budget tier: van.");
+      expect(prompt).toContain("Current room size: not stated; Soundcheck guesses a tier from Qloo popularity");
       expect(prompt).toContain("Locked cities (must be on the tour): London.");
       expect(prompt).toContain("Excluded cities (must not be on the tour): Leeds.");
       expect(prompt).toContain("Requested city order: London → Bristol → Manchester.");
@@ -31,6 +32,38 @@ describe("comparison prompt constraints", () => {
       expect(candidates).not.toContain("Leeds");
     }
     expect(prompts[1]).toContain(prompts[0]);
+  });
+});
+
+describe("room tier", () => {
+  const pool: CityPoolEntry[] = [
+    { id: "london", name: "London", country: "GB", lat: 51.5, lon: -0.1 },
+    { id: "bristol", name: "Bristol", country: "GB", lat: 51.4, lon: -2.6 },
+    { id: "manchester", name: "Manchester", country: "GB", lat: 53.5, lon: -2.2 },
+  ];
+  const input = PlanInput.parse({ actQuery: "Test Act", region: "uk-ireland", stops: 3, roomTier: "800to2000" });
+
+  it("states the room tier in the shared brief, for both comparison arms", () => {
+    const line = "Current room size: 800 to 2,000 (stated in the brief). Room suggestions are anchored on it; Qloo does not know ticket draw.";
+    expect(agentPrompt(input, pool)).toContain(line);
+    expect(withoutQlooPrompt(input, pool)).toContain(line);
+  });
+
+  it("asks copy to name the anchor tier and flag a guessed one", () => {
+    expect(COPY_INSTRUCTIONS).toContain("soundcheck.roomTier");
+    expect(COPY_INSTRUCTIONS).toContain("soundcheck.roomTierGuessed");
+    expect(COPY_INSTRUCTIONS).toContain("anchored on the stated 800 to 2,000 tier");
+  });
+
+  it("offers roomTier as a revise control with every value and label, and shows the current one", () => {
+    expect(REVISE_INSTRUCTIONS).toContain("roomTier:");
+    for (const v of ["under300 (Under 300)", "300to800 (300 to 800)", "800to2000 (800 to 2,000)", "2000to5000 (2,000 to 5,000)", "over5000 (Over 5,000)"]) {
+      expect(REVISE_INSTRUCTIONS).toContain(v);
+    }
+    const plan = { input, act: { id: "a", name: "Test Act", type: "artist" as const, tasteTags: [], links: [], popularity: 0.95 }, stops: [] };
+    expect(revisePrompt(plan, pool, "bigger rooms")).toContain("roomTier 800to2000 = 800 to 2,000 (stated in the brief);");
+    const guessed = { ...plan, input: { ...input, roomTier: undefined } };
+    expect(revisePrompt(guessed, pool, "bigger rooms")).toContain("roomTier 300to800 = 300 to 800 (guessed from Qloo popularity);");
   });
 });
 

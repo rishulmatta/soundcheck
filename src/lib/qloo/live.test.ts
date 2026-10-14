@@ -182,6 +182,78 @@ describe("LiveQlooClient envelopes", () => {
   });
 });
 
+describe("relatedActs opener popularity band", () => {
+  const BAND = { min: 0.65, max: 0.95 };
+  const opener = (n: number, popularity: number) => synthEntity(`00000000-0000-4000-8000-00000000010${n}`, `Synthetic Opener ${n}`, { popularity });
+
+  it("sends filter.popularity.min/max and notes the band on success", async () => {
+    const { client, calls } = setup([json({ results: { entities: [opener(1, 0.82), opener(2, 0.9)] } })]);
+    const res = await client.relatedActs(ACT, "artist", { locationQuery: "Boise", take: 2, popularity: BAND });
+    expect(calls[0].url).toBe(
+      `https://hackathon.api.qloo.com/v2/insights?filter.type=urn:entity:artist&signal.interests.entities=${ACT}&signal.location.query=Boise&filter.exclude.entities=${ACT}&filter.popularity.min=0.65&filter.popularity.max=0.95&take=2`,
+    );
+    expect(res.status).toBe("ok");
+    expect(res.meta.request).toContain("filter.popularity.min=0.65&filter.popularity.max=0.95");
+    expect(res.meta.note).toBe("opener band popularity 0.65..0.95");
+  });
+
+  it("omits the popularity params when no band is given", async () => {
+    const { client, calls } = setup([json({ results: { entities: [opener(1, 0.99)] } })]);
+    await client.relatedActs(ACT, "artist", { locationQuery: "Boise", take: 1 });
+    expect(calls[0].url).not.toContain("filter.popularity");
+  });
+
+  it("drops the band before the city: localized+band, localized, unlocalized+band, unlocalized", async () => {
+    const empty = () => json({ results: { entities: [] } });
+    const { client, calls } = setup([empty(), empty(), empty(), json({ results: { entities: [opener(1, 0.99)] } })]);
+    const res = await client.relatedActs(ACT, "artist", { locationQuery: "Boise", take: 1, popularity: BAND });
+    const shape = calls.map((c) => [c.url.includes("signal.location.query=Boise"), c.url.includes("filter.popularity.max=0.95")]);
+    expect(shape).toEqual([
+      [true, true],
+      [true, false],
+      [false, true],
+      [false, false],
+    ]);
+    expect(res.status).toBe("degraded");
+    expect(res.meta.note).toContain("fallback: not localized to the city; no related acts inside the opener popularity band; ceiling dropped");
+    expect(res.meta.note).not.toContain("opener band popularity");
+    expect(res.data[0].popularity).toBeCloseTo(0.99);
+  });
+
+  it('falls back to the localized query without the band as "degraded"', async () => {
+    const { client, calls } = setup([json({ results: { entities: [] } }), json({ results: { entities: [opener(1, 0.99)] } })]);
+    const res = await client.relatedActs(ACT, "artist", { locationQuery: "Boise", take: 1, popularity: BAND });
+    expect(calls).toHaveLength(2);
+    expect(calls[1].url).toContain("signal.location.query=Boise");
+    expect(calls[1].url).not.toContain("filter.popularity");
+    expect(res.status).toBe("degraded");
+    expect(res.meta.note).toContain("fallback: no related acts inside the opener popularity band; ceiling dropped");
+    expect(res.meta.note).not.toContain("not localized");
+  });
+
+  it("removes acts above the band ceiling on a band step, but not on the no-band fallback", async () => {
+    const { client } = setup([json({ results: { entities: [opener(1, 0.82), opener(2, 0.96), opener(3, 1)] } })]);
+    const res = await client.relatedActs(ACT, "artist", { locationQuery: "Boise", take: 3, popularity: BAND });
+    expect(res.data.map((e) => e.popularity)).toEqual([0.82]);
+    expect(res.status).toBe("partial");
+    expect(res.meta.note).toContain("2 above the band ceiling removed");
+    expect(res.meta.note).toContain("opener band popularity 0.65..0.95");
+
+    const second = setup([json({ results: { entities: [opener(4, 0.99)] } }), json({ results: { entities: [opener(5, 0.99)] } })]);
+    const fb = await second.client.relatedActs(ACT, "artist", { locationQuery: "Boise", take: 1, popularity: BAND });
+    expect(second.calls).toHaveLength(2);
+    expect(fb.status).toBe("degraded");
+    expect(fb.data.map((e) => e.name)).toEqual(["Synthetic Opener 5"]);
+  });
+
+  it("keeps an act at the ceiling within rounding", async () => {
+    const { client } = setup([json({ results: { entities: [opener(1, 0.955)] } })]);
+    const res = await client.relatedActs(ACT, "artist", { take: 1, popularity: BAND });
+    expect(res.status).toBe("ok");
+    expect(res.data).toHaveLength(1);
+  });
+});
+
 describe("cache", () => {
   it("serves the second identical request from cache", async () => {
     const body = { results: { tags: [{ tag_id: "urn:tag:genre:music:indie", name: "Indie", subtype: "urn:tag:genre:music" }] } };
