@@ -11,6 +11,7 @@ Read order for a new session: `docs/RESEARCH.md` (research + API mapping) → `d
 ## Session 8: icon and gallery images
 
 - Designed the Soundcheck icon (route drawn as a check, signal-blue untapped stop with the Qloo pulse) and captured 3:2 gallery screenshots from production for Devpost. All in `docs/design/` with a README. The app now serves them: `src/app/favicon.ico` (16/32/48), `icon.svg`, `apple-icon.png`, `opengraph-image.png` (1200 × 630 from `docs/design/gallery/cover.html`) with alt text; `metadataBase` set to the Vercel production URL so OG URLs are absolute.
+- Verification: typecheck, lint, 261 tests, production build. Deployed commit `3ea234c` to Railway (deployment `0515866b-776e-4a80-8ba9-e7ef0d7de092`, SUCCESS; `/api/health` ok, qloo live, demos persisted) and Vercel production (`soundcheck-exv90vwif-shunyatechs-projects.vercel.app`, aliased to https://soundcheck-amber-two.vercel.app ). Both serve the new favicon (checksum matches the repo), `icon.svg`, `apple-icon.png` and the absolute `og:image`.
 - Seen on the phone tour (390 px), not fixed: the map attribution pill overlaps the "STOP n OF 6" label top-left, and the card's "provisional 12/42 · pop 0.54" line overflows the card's right edge.
 
 ## Session 7: openers below the headliner, rooms anchored on a stated tier
