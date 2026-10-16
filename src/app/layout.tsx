@@ -7,6 +7,7 @@ const sans = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600"], 
 const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-plex-mono", display: "swap" });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://soundcheck-amber-two.vercel.app"),
   title: "Soundcheck",
   description: "Tour market discovery for independent artist managers. Explore audience signals, travel tradeoffs and culturally aligned partners.",
 };
