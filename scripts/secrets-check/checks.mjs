@@ -13,11 +13,11 @@ export const checks = [
   // deployed: the running services agree with the store
   { id: 'deployed.railway.health', group: 'deployed', run: async (e) => { const r = expect(await http(`${railway(e)}/api/health`), 200); const h = r.json; if (!h.ok || h.kv?.status !== 'ok' || h.qloo !== 'live' || !h.model) throw new Error(JSON.stringify(h)); return `kv ${h.kv.kind} ok, qloo ${h.qloo}, anthropic key present, seeded ${Object.values(h.seeded).filter(Boolean).length}/${Object.keys(h.seeded).length}` } },
   { id: 'deployed.railway.admin-token', group: 'deployed', needs: ['SOUNDCHECK_ADMIN_TOKEN'], run: async (e) => {
-      const url = `${railway(e)}/api/plan/not-a-plan-id`
+      const url = `${railway(e)}/api/plan/secrets-check-probe` // a plan id that never exists; deleting it is a no-op
       const wrong = await http(url, { method: 'DELETE', headers: { Authorization: 'Bearer secrets-check-wrong-token' } })
       if (wrong.status === 404) throw new Inconclusive('service answers 404 to a wrong token: SOUNDCHECK_ADMIN_TOKEN is not configured on the running service (or it was redeployed without it)')
       if (wrong.status !== 401) throw new Error(`unexpected ${wrong.status} for a wrong token`)
-      return syncFromStatus(await http(url, { method: 'DELETE', headers: { Authorization: `Bearer ${e.SOUNDCHECK_ADMIN_TOKEN}` } }), [404], 'admin DELETE') } },
+      return syncFromStatus(await http(url, { method: 'DELETE', headers: { Authorization: `Bearer ${e.SOUNDCHECK_ADMIN_TOKEN}` } }), [200, 404], 'admin DELETE') } },
   { id: 'deployed.vercel.health', group: 'deployed', run: async (e) => { const r = expect(await http(`${vercel(e)}/api/health`), 200); return `web up (${r.json.kv ? 'has its own kv' : 'proxying to backend'})` } },
   { id: 'deployed.vercel.backend-proxy', group: 'deployed', run: async (e) => { const r = expect(await http(`${vercel(e)}/api/plan/demo-musician`), 200); return `web → Railway backend serves the seeded plan (${r.json?.brief?.name ?? r.json?.id ?? 'ok'})` } },
 
