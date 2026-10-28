@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "seed": "pnpm dlx tsx scripts/seed.ts"
+    "seed": "pnpm dlx tsx scripts/seed.ts",
+    "secrets:check": "node scripts/secrets-check/cli.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.78",
